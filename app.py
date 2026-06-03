@@ -112,7 +112,6 @@ def render_project_intro_editor(response: dict, sections: dict) -> None:
         st.session_state.project_intro_text = intro_default
     response["ai_introduction"] = st.text_area(
         "Report introduction and aims",
-        value=st.session_state.project_intro_text,
         height=220,
         key="project_intro_text",
         help="This text will be included in the Word report. Edit it freely before downloading.",
