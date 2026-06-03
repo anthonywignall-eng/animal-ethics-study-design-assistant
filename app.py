@@ -2,8 +2,10 @@
 
 import streamlit as st
 
+from ai_writer import generate_ai_introduction, get_openai_settings
 from config import APP_TITLE, ETHICS_DISCLAIMER, LANDING_TEXT, STAGES
 from data_model import empty_response
+from flowchart import render_flowchart_png
 from questionnaire import render_stage
 from report_generator import build_report_sections, generate_docx_report
 
@@ -24,6 +26,7 @@ def initialise_session() -> None:
 def reset_questionnaire() -> None:
     st.session_state.response = empty_response()
     st.session_state.step = 0
+    st.session_state.pop("project_intro_text", None)
 
 
 def apply_styles() -> None:
@@ -35,6 +38,7 @@ def apply_styles() -> None:
         .small-note {color: #52606d; font-size: 0.92rem; line-height: 1.45;}
         .disclaimer {border-left: 4px solid #52606d; background: #f5f7fa; padding: 0.9rem 1rem; color: #243b53;}
         .readiness {border: 1px solid #bcccdc; border-radius: 6px; padding: 1rem; background: #f8fafc;}
+        .recommendation {border: 1px solid #9fb3c8; border-radius: 6px; padding: 1rem; background: #f7fbff;}
         div.stButton > button {border-radius: 6px;}
         </style>
         """,
@@ -68,7 +72,7 @@ def render_sidebar() -> None:
             st.progress(1.0)
             st.write("Final review and report")
         st.divider()
-        st.caption("Responses are held in this browser session only. Version 1 does not use a database, login system, external AI, or external API calls.")
+        st.caption("Responses are held in this browser session only. If optional OpenAI drafting is enabled, the selected summary fields are sent to OpenAI to draft report wording.")
 
 
 def render_navigation() -> None:
@@ -85,12 +89,55 @@ def render_navigation() -> None:
             st.rerun()
 
 
+def render_project_intro_editor(response: dict, sections: dict) -> None:
+    recommendation = sections["recommendation"]
+    api_key, model = get_openai_settings(st.secrets)
+
+    st.header("Project Introduction and Aims")
+    if api_key:
+        st.caption("Optional ChatGPT drafting is enabled. It drafts wording only; the study recommendation remains rule-based.")
+        if st.button("Generate AI introduction and aims"):
+            with st.spinner("Drafting introduction and aims..."):
+                try:
+                    response["ai_introduction"] = generate_ai_introduction(response, recommendation, api_key=api_key, model=model)
+                    st.session_state.project_intro_text = response["ai_introduction"]
+                    st.success("Draft introduction generated. Please review and edit before using it.")
+                except Exception as error:
+                    st.error(f"Could not generate the AI draft: {error}")
+    else:
+        st.info("OpenAI drafting is not enabled, so the app is using a rule-based introduction. Add OPENAI_API_KEY in Streamlit secrets to enable ChatGPT drafting.")
+
+    intro_default = response.get("ai_introduction") or sections["project_introduction"]
+    if "project_intro_text" not in st.session_state:
+        st.session_state.project_intro_text = intro_default
+    response["ai_introduction"] = st.text_area(
+        "Report introduction and aims",
+        value=st.session_state.project_intro_text,
+        height=220,
+        key="project_intro_text",
+        help="This text will be included in the Word report. Edit it freely before downloading.",
+    )
+
+
 def render_results() -> None:
     response = st.session_state.response
     sections = build_report_sections(response)
+    recommendation = sections["recommendation"]
 
     st.subheader("Stage 10: Final Review and Report")
     st.markdown(f"<div class='readiness'><strong>Readiness classification:</strong><br>{sections['readiness']}</div>", unsafe_allow_html=True)
+
+    st.header("Recommended Study Design")
+    st.markdown(f"<div class='recommendation'><strong>{recommendation.pathway}</strong><br>{recommendation.summary}</div>", unsafe_allow_html=True)
+    if recommendation.rationale:
+        st.markdown("**Why this pathway was selected**")
+        for item in recommendation.rationale:
+            st.write(f"- {item}")
+
+    st.markdown("**Rule-based study flowchart**")
+    st.image(render_flowchart_png(recommendation.flowchart_steps).getvalue(), caption="Recommended MTD study pathway based on supplied answers")
+
+    render_project_intro_editor(response, sections)
 
     st.header("Proposed Study Summary")
     st.write(sections["study_summary"])
@@ -104,6 +151,18 @@ def render_results() -> None:
     st.header("Route and Schedule")
     st.table(sections["route_schedule"])
 
+    st.header("Animal Ethics Procedure Considerations")
+    st.caption("These are rule-based procedure considerations and must be checked against the final protocol, facility SOPs, veterinary advice and AEC requirements.")
+    st.dataframe(sections["procedure_ethics"], use_container_width=True, hide_index=True)
+
+    st.header("Welfare Cost to Animals")
+    for item in sections["welfare_costs"]:
+        st.write(f"- {item}")
+
+    st.header("Animal Timeline")
+    for index, item in enumerate(sections["animal_timeline"], start=1):
+        st.write(f"{index}. {item}")
+
     left, right = st.columns(2)
     with left:
         st.header("Monitoring and Welfare Framework")
@@ -115,8 +174,8 @@ def render_results() -> None:
             else:
                 st.write(value)
     with right:
-        st.header("Animal-use Reduction Strategy")
-        for key, value in sections["reduction"].items():
+        st.header("Replacement, Reduction and Refinement")
+        for key, value in sections["three_rs"].items():
             st.markdown(f"**{key}**")
             st.write(value)
 
@@ -133,6 +192,10 @@ def render_results() -> None:
             st.write(f"- {item}")
     else:
         st.success("No design warnings or considerations identified by the current rule set.")
+
+    st.header("Assumptions and Items Requiring Protocol Confirmation")
+    for item in sections["assumptions"]:
+        st.write(f"- {item}")
 
     st.header("Draft Ethics-application Content")
     st.caption("Draft wording is generated from supplied answers and rule-based prompts only. It requires investigator review.")
