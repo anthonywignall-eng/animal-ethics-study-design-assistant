@@ -9,8 +9,11 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Inches, Pt
 
+from ai_writer import build_rule_based_introduction
 from config import ETHICS_DISCLAIMER
+from flowchart import render_flowchart_png
 from rules import evaluate_rules
+from study_recommender import StudyRecommendation, recommend_study_design
 
 
 NOT_SUPPLIED = "Not supplied"
@@ -27,17 +30,26 @@ def clean(value) -> str:
 
 def build_report_sections(response: dict) -> dict:
     evaluation = evaluate_rules(response)
+    recommendation = recommend_study_design(response)
+    project_introduction = response.get("ai_introduction") or build_rule_based_introduction(response, recommendation)
     sections = {
         "readiness": evaluation.readiness,
+        "project_introduction": project_introduction,
+        "recommendation": recommendation,
         "study_summary": build_study_summary(response),
         "test_articles": build_test_article_table(response),
         "animal_model": build_animal_model_table(response, evaluation),
         "route_schedule": build_route_schedule_table(response),
+        "procedure_ethics": build_procedure_ethics_table(recommendation),
         "welfare": build_welfare_summary(response),
+        "welfare_costs": recommendation.welfare_costs,
         "reduction": build_reduction_summary(response),
+        "three_rs": recommendation.three_rs,
+        "animal_timeline": recommendation.animal_timeline,
+        "assumptions": recommendation.assumptions,
         "critical_missing": evaluation.all_missing,
         "warnings": evaluation.all_warnings_and_considerations,
-        "draft_ethics": build_draft_ethics_sections(response, evaluation),
+        "draft_ethics": build_draft_ethics_sections(response, evaluation, recommendation),
     }
     return sections
 
@@ -119,6 +131,21 @@ def build_route_schedule_table(response: dict) -> list[dict]:
     ]
 
 
+def build_procedure_ethics_table(recommendation: StudyRecommendation) -> list[dict]:
+    rows = []
+    for item in recommendation.procedure_items:
+        rows.append(
+            {
+                "Procedure": item.procedure,
+                "Why included": item.why_included,
+                "Associated pain/distress": item.associated_pain_or_distress,
+                "Anaesthesia/analgesia consideration": item.anaesthesia_or_analgesia_consideration,
+                "Welfare cost": item.welfare_cost,
+            }
+        )
+    return rows
+
+
 def build_welfare_summary(response: dict) -> dict:
     monitoring_frequency = {
         "Routine monitoring": clean(response.get("monitoring_routine")),
@@ -147,13 +174,20 @@ def build_reduction_summary(response: dict) -> dict:
     }
 
 
-def build_draft_ethics_sections(response: dict, evaluation) -> dict:
+def build_draft_ethics_sections(response: dict, evaluation, recommendation: StudyRecommendation) -> dict:
     missing_prompt = "Investigator confirmation is required for: " + clean(evaluation.all_missing)
+    procedures_text = " ".join(
+        f"{item.procedure}: {item.associated_pain_or_distress} {item.anaesthesia_or_analgesia_consideration}"
+        for item in recommendation.procedure_items
+    )
+    welfare_cost_text = " ".join(recommendation.welfare_costs)
+    timeline_text = " ".join(recommendation.animal_timeline)
     return {
         "Scientific aim": _paragraph(
             [
                 f"Draft prompt: This study aims to support the following decision: {response.get('immediate_decision')}.",
                 f"The proposed downstream study is: {response.get('downstream_study')}.",
+                f"The recommended design pathway is: {recommendation.pathway}.",
             ]
         ),
         "Justification for animal use": clean(response.get("replacement_rationale"))
@@ -172,8 +206,12 @@ def build_draft_ethics_sections(response: dict, evaluation) -> dict:
                 f"Draft prompt: Test article category or categories: {clean(response.get('test_article_types'))}.",
                 f"Animal model: {clean(response.get('species'))}, strain {clean(response.get('strain'))}, sex {clean(response.get('sex'))}.",
                 f"Route: {clean(response.get('route'))}. MTD schedule: {clean(response.get('mtd_schedule'))}.",
+                f"Study pathway: {recommendation.pathway}.",
             ]
         ),
+        "Procedures and associated pain/distress": procedures_text,
+        "Welfare cost to animals": welfare_cost_text,
+        "Animal timeline from arrival to study completion": timeline_text,
         "Anticipated adverse effects and animal welfare impact": clean(response.get("anticipated_adverse_effects")),
         "Monitoring and humane endpoints": _paragraph(
             [
@@ -183,9 +221,9 @@ def build_draft_ethics_sections(response: dict, evaluation) -> dict:
                 f"Cohort stopping rule: {clean(response.get('cohort_toxicity_action'))}.",
             ]
         ),
-        "Replacement": clean(response.get("replacement_rationale")),
-        "Reduction": clean(response.get("reduction_measures") or response.get("animal_number_minimisation")),
-        "Refinement": clean(response.get("refinement_measures")),
+        "Replacement": recommendation.three_rs.get("Replacement", clean(response.get("replacement_rationale"))),
+        "Reduction": recommendation.three_rs.get("Reduction", clean(response.get("reduction_measures") or response.get("animal_number_minimisation"))),
+        "Refinement": recommendation.three_rs.get("Refinement", clean(response.get("refinement_measures"))),
         "Information still requiring investigator confirmation": missing_prompt,
     }
 
@@ -197,6 +235,7 @@ def _paragraph(parts: list[str]) -> str:
 
 def generate_docx_report(response: dict) -> BytesIO:
     sections = build_report_sections(response)
+    recommendation = sections["recommendation"]
     document = Document()
     _configure_document(document)
 
@@ -211,31 +250,60 @@ def generate_docx_report(response: dict) -> BytesIO:
     document.add_heading("A. Readiness Classification", level=1)
     document.add_paragraph(sections["readiness"])
 
-    document.add_heading("B. Proposed Study Summary", level=1)
+    document.add_heading("B. Project Introduction and Aims", level=1)
+    document.add_paragraph(clean(sections["project_introduction"]))
+
+    document.add_heading("C. Recommended Study Design", level=1)
+    document.add_paragraph(recommendation.summary)
+    document.add_paragraph("Recommendation rationale:").runs[0].bold = True
+    _add_bullets(document, recommendation.rationale or ["No recommendation rationale supplied."])
+    document.add_paragraph("Rule-based study flowchart:").runs[0].bold = True
+    flowchart_image = render_flowchart_png(recommendation.flowchart_steps)
+    document.add_picture(flowchart_image, width=Inches(6.5))
+
+    document.add_heading("D. Proposed Study Summary", level=1)
     document.add_paragraph(sections["study_summary"])
 
-    document.add_heading("C. Proposed Test Articles", level=1)
+    document.add_heading("E. Proposed Test Articles", level=1)
     _add_table(document, sections["test_articles"])
 
-    document.add_heading("D. Proposed Animal Model", level=1)
+    document.add_heading("F. Proposed Animal Model", level=1)
     _add_table(document, sections["animal_model"])
 
-    document.add_heading("E. Route and Schedule", level=1)
+    document.add_heading("G. Route and Schedule", level=1)
     _add_table(document, sections["route_schedule"])
 
-    document.add_heading("F. Monitoring and Welfare Framework", level=1)
+    document.add_heading("H. Animal Ethics Procedure Considerations", level=1)
+    document.add_paragraph(
+        "The following procedure table is rule-based and should be checked against the final protocol, facility SOPs, veterinary advice and AEC requirements."
+    )
+    _add_table(document, sections["procedure_ethics"])
+
+    document.add_heading("I. Welfare Cost to Animals", level=1)
+    _add_bullets(document, sections["welfare_costs"])
+
+    document.add_heading("J. Animal Timeline", level=1)
+    _add_numbered_list(document, sections["animal_timeline"])
+
+    document.add_heading("K. Monitoring and Welfare Framework", level=1)
     _add_key_value_section(document, sections["welfare"])
 
-    document.add_heading("G. Proposed Animal-use Reduction Strategy", level=1)
+    document.add_heading("L. Proposed Animal-use Reduction Strategy", level=1)
     _add_key_value_section(document, sections["reduction"])
 
-    document.add_heading("H. Critical Missing Information", level=1)
+    document.add_heading("M. Replacement, Reduction and Refinement", level=1)
+    _add_key_value_section(document, sections["three_rs"])
+
+    document.add_heading("N. Critical Missing Information", level=1)
     _add_bullets(document, sections["critical_missing"] or ["No critical missing information identified by the current rule set."])
 
-    document.add_heading("I. Design Warnings and Considerations", level=1)
+    document.add_heading("O. Design Warnings and Considerations", level=1)
     _add_bullets(document, sections["warnings"] or ["No design warnings or considerations identified by the current rule set."])
 
-    document.add_heading("J. Draft Ethics-application Content", level=1)
+    document.add_heading("P. Assumptions and Protocol Items Requiring Confirmation", level=1)
+    _add_bullets(document, sections["assumptions"])
+
+    document.add_heading("Q. Draft Ethics-application Content", level=1)
     for heading, text in sections["draft_ethics"].items():
         document.add_heading(heading, level=2)
         document.add_paragraph(clean(text))
@@ -285,3 +353,8 @@ def _add_key_value_section(document: Document, values: dict) -> None:
 def _add_bullets(document: Document, items: list[str]) -> None:
     for item in items:
         document.add_paragraph(clean(item), style="List Bullet")
+
+
+def _add_numbered_list(document: Document, items: list[str]) -> None:
+    for item in items:
+        document.add_paragraph(clean(item), style="List Number")
