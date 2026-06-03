@@ -11,7 +11,7 @@ from report_generator import build_report_sections, generate_docx_report
 REPORT_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
-st.set_page_config(page_title=APP_TITLE, page_icon="AE", layout="wide")
+st.set_page_config(page_title=APP_TITLE, page_icon=":clipboard:", layout="wide")
 
 
 def initialise_session() -> None:
