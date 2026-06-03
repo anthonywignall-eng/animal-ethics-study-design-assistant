@@ -2,12 +2,18 @@
 
 This module deliberately avoids external AI/API calls. It creates conservative,
 editable draft wording from the supplied questionnaire responses and the transparent
-study recommendation.
+study recommendation. Compatibility functions are retained so older app code cannot
+crash, but they never enable or call OpenAI.
 """
 
 from __future__ import annotations
 
 from study_recommender import StudyRecommendation
+
+
+def get_openai_settings(secrets=None) -> tuple[None, str]:
+    """Compatibility shim: OpenAI drafting is disabled in this version."""
+    return None, ""
 
 
 def build_rule_based_introduction(response: dict, recommendation: StudyRecommendation) -> str:
@@ -26,3 +32,8 @@ def build_rule_based_introduction(response: dict, recommendation: StudyRecommend
         "while documenting missing information, procedure-related welfare considerations and items requiring investigator, "
         "veterinary and Animal Ethics Committee review. This wording is a draft aid only and must be reviewed before use in an ethics application."
     )
+
+
+def generate_ai_introduction(response: dict, recommendation: StudyRecommendation, api_key: str | None = None, model: str = "") -> str:
+    """Compatibility shim: return the rule-based draft instead of calling an API."""
+    return build_rule_based_introduction(response, recommendation)
