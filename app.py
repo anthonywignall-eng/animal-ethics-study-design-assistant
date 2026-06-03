@@ -2,7 +2,6 @@
 
 import streamlit as st
 
-from ai_writer import generate_ai_introduction, get_openai_settings
 from config import APP_TITLE, ETHICS_DISCLAIMER, LANDING_TEXT, STAGES
 from data_model import empty_response
 from flowchart import render_flowchart_png
@@ -12,15 +11,12 @@ from report_generator import build_report_sections, generate_docx_report
 
 REPORT_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-
 st.set_page_config(page_title=APP_TITLE, page_icon=":clipboard:", layout="wide")
 
 
 def initialise_session() -> None:
-    if "response" not in st.session_state:
-        st.session_state.response = empty_response()
-    if "step" not in st.session_state:
-        st.session_state.step = 0
+    st.session_state.setdefault("response", empty_response())
+    st.session_state.setdefault("step", 0)
 
 
 def reset_questionnaire() -> None:
@@ -35,7 +31,6 @@ def apply_styles() -> None:
         <style>
         .main .block-container {max-width: 1180px; padding-top: 2rem; padding-bottom: 3rem;}
         h1, h2, h3 {color: #1f2933;}
-        .small-note {color: #52606d; font-size: 0.92rem; line-height: 1.45;}
         .disclaimer {border-left: 4px solid #52606d; background: #f5f7fa; padding: 0.9rem 1rem; color: #243b53;}
         .readiness {border: 1px solid #bcccdc; border-radius: 6px; padding: 1rem; background: #f8fafc;}
         .recommendation {border: 1px solid #9fb3c8; border-radius: 6px; padding: 1rem; background: #f7fbff;}
@@ -72,12 +67,12 @@ def render_sidebar() -> None:
             st.progress(1.0)
             st.write("Final review and report")
         st.divider()
-        st.caption("Responses are held in this browser session only. If optional OpenAI drafting is enabled, the selected summary fields are sent to OpenAI to draft report wording.")
+        st.caption("Responses are held in this browser session only. Version 1 does not use a database, login system, external AI or external API calls.")
 
 
 def render_navigation() -> None:
     st.divider()
-    previous_col, spacer_col, next_col = st.columns([1, 4, 1])
+    previous_col, _, next_col = st.columns([1, 4, 1])
     with previous_col:
         if st.button("Previous", disabled=st.session_state.step <= 1):
             st.session_state.step -= 1
@@ -90,23 +85,8 @@ def render_navigation() -> None:
 
 
 def render_project_intro_editor(response: dict, sections: dict) -> None:
-    recommendation = sections["recommendation"]
-    api_key, model = get_openai_settings(st.secrets)
-
     st.header("Project Introduction and Aims")
-    if api_key:
-        st.caption("Optional ChatGPT drafting is enabled. It drafts wording only; the study recommendation remains rule-based.")
-        if st.button("Generate AI introduction and aims"):
-            with st.spinner("Drafting introduction and aims..."):
-                try:
-                    response["ai_introduction"] = generate_ai_introduction(response, recommendation, api_key=api_key, model=model)
-                    st.session_state.project_intro_text = response["ai_introduction"]
-                    st.success("Draft introduction generated. Please review and edit before using it.")
-                except Exception as error:
-                    st.error(f"Could not generate the AI draft: {error}")
-    else:
-        st.info("OpenAI drafting is not enabled, so the app is using a rule-based introduction. Add OPENAI_API_KEY in Streamlit secrets to enable ChatGPT drafting.")
-
+    st.caption("This draft is generated from supplied answers and rule-based recommendations. Edit it before downloading the Word report.")
     intro_default = response.get("ai_introduction") or sections["project_introduction"]
     if "project_intro_text" not in st.session_state:
         st.session_state.project_intro_text = intro_default
@@ -118,12 +98,23 @@ def render_project_intro_editor(response: dict, sections: dict) -> None:
     )
 
 
+def render_key_values(title: str, values: dict) -> None:
+    st.header(title)
+    for key, value in values.items():
+        st.markdown(f"**{key}**")
+        if isinstance(value, dict):
+            for nested_key, nested_value in value.items():
+                st.write(f"- {nested_key}: {nested_value}")
+        else:
+            st.write(value)
+
+
 def render_results() -> None:
     response = st.session_state.response
     sections = build_report_sections(response)
     recommendation = sections["recommendation"]
 
-    st.subheader("Stage 10: Final Review and Report")
+    st.subheader("Final Review and Report")
     st.markdown(f"<div class='readiness'><strong>Readiness classification:</strong><br>{sections['readiness']}</div>", unsafe_allow_html=True)
 
     st.header("Recommended Study Design")
@@ -164,19 +155,9 @@ def render_results() -> None:
 
     left, right = st.columns(2)
     with left:
-        st.header("Monitoring and Welfare Framework")
-        for key, value in sections["welfare"].items():
-            st.markdown(f"**{key}**")
-            if isinstance(value, dict):
-                for nested_key, nested_value in value.items():
-                    st.write(f"- {nested_key}: {nested_value}")
-            else:
-                st.write(value)
+        render_key_values("Monitoring and Welfare Framework", sections["welfare"])
     with right:
-        st.header("Replacement, Reduction and Refinement")
-        for key, value in sections["three_rs"].items():
-            st.markdown(f"**{key}**")
-            st.write(value)
+        render_key_values("Replacement, Reduction and Refinement", sections["three_rs"])
 
     st.header("Critical Missing Information")
     if sections["critical_missing"]:
