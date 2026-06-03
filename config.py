@@ -17,23 +17,18 @@ LANDING_TEXT = [
     "This guided tool assists researchers in defining the scientific and welfare-related "
     "components of an in vivo maximum tolerated dose study involving exatecan, SN-38, "
     "related prodrugs or antibody-drug conjugates.",
-    "Your responses will be used to generate a structured study-design summary, identify "
-    "missing information, highlight design considerations and provide draft wording prompts "
-    "for preparation of an animal ethics application.",
+    "Your responses will be used to recommend a study-design pathway, generate a flowchart, "
+    "identify missing information, highlight animal ethics considerations and provide draft "
+    "wording prompts for preparation of an animal ethics application.",
     "This tool does not replace investigator judgement, veterinary advice or review and "
     "approval by an Animal Ethics Committee.",
 ]
 
 STAGES = [
-    {"id": "project", "title": "Project Purpose"},
-    {"id": "selection", "title": "Test Article Selection"},
-    {"id": "details", "title": "Test Article Details"},
-    {"id": "animal_model", "title": "Animal Model"},
-    {"id": "route_schedule", "title": "Route, Dose and Schedule"},
-    {"id": "tolerability", "title": "Defining Tolerability and MTD"},
-    {"id": "welfare", "title": "Monitoring and Welfare"},
-    {"id": "numbers", "title": "Animal Numbers and Reduction Strategy"},
-    {"id": "three_rs", "title": "Replacement, Reduction and Refinement"},
+    {"id": "core_project", "title": "Core Aim and Test Article"},
+    {"id": "article_readiness", "title": "Compound or ADC Readiness"},
+    {"id": "design_drivers", "title": "Model, Route and Schedule"},
+    {"id": "welfare_use", "title": "Welfare and Animal-use Essentials"},
 ]
 
 MODULE_REGISTRY = {
