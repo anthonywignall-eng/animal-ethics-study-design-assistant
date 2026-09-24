@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
     private static final String MODE_OFF = "off";
     private static final long HALF_HOUR = 30L * 60L * 1000L;
     private static final long REPEAT_WINDOW = 2L * 60L * 1000L;
-    private static final int ONBOARDING_VERSION = 6;
+    private static final int ONBOARDING_VERSION = 7;
 
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
