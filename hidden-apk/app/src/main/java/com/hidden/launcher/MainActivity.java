@@ -391,7 +391,8 @@ public class MainActivity extends Activity {
         if ("grayscale".equals(raw)) return "dark";
         if ("system".equals(raw)) return ThemeArt.resolve("system", getResources());
         if ("light".equals(raw) || "dark".equals(raw) || "oled".equals(raw) ||
-            "doom_light".equals(raw) || "doom_dark".equals(raw) || "8bit".equals(raw)) {
+            "doom_light".equals(raw) || "doom_dark".equals(raw) ||
+            "soft_launch".equals(raw) || "moth".equals(raw) || "8bit".equals(raw)) {
             return raw;
         }
         return "dark";
@@ -412,7 +413,7 @@ public class MainActivity extends Activity {
     private boolean useDarkPalette() {
         String mode = currentTheme();
         return "dark".equals(mode) || "oled".equals(mode) ||
-            "doom_dark".equals(mode) || "8bit".equals(mode);
+            "doom_dark".equals(mode) || "moth".equals(mode) || "8bit".equals(mode);
     }
 
     private void setPaletteValues(String rawTheme) {
@@ -428,7 +429,7 @@ public class MainActivity extends Activity {
         String mode = currentTheme();
         setPaletteValues(mode);
 
-        boolean lightBars = "light".equals(mode) || "doom_light".equals(mode);
+        boolean lightBars = "light".equals(mode) || "doom_light".equals(mode) || "soft_launch".equals(mode);
         int systemUi = lightBars
             ? (View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR)
             : 0;
@@ -520,6 +521,9 @@ public class MainActivity extends Activity {
         } else if (isDoomTheme()) {
             t.setTypeface(Typeface.create("sans-serif-condensed", Typeface.NORMAL));
             t.setLetterSpacing(0.035f);
+        } else if (isTheme("soft_launch")) {
+            t.setTypeface(Typeface.create("sans-serif-rounded", Typeface.NORMAL));
+            t.setLetterSpacing(0.012f);
         } else {
             t.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         }
@@ -533,6 +537,12 @@ public class MainActivity extends Activity {
         } else if (isDoomTheme()) {
             t.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
             t.setLetterSpacing(0.055f);
+        } else if (isTheme("soft_launch")) {
+            t.setTypeface(Typeface.create("sans-serif-rounded", Typeface.BOLD));
+            t.setLetterSpacing(0.018f);
+        } else if (isTheme("moth")) {
+            t.setTypeface(Typeface.create("serif", Typeface.BOLD));
+            t.setLetterSpacing(0.018f);
         } else {
             t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         }
@@ -1491,7 +1501,7 @@ public class MainActivity extends Activity {
         copy.setLineSpacing(0, 1.22f);
         content.addView(copy);
 
-        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "8bit"};
+        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "soft_launch", "moth", "8bit"};
         for (String theme : themes) {
             boolean selected = theme.equals(currentTheme());
             ThemePreviewView preview = new ThemePreviewView(this, theme, selected);
@@ -1681,6 +1691,8 @@ public class MainActivity extends Activity {
         if ("oled".equals(t)) return "OLED";
         if ("doom_light".equals(t)) return "DOOM SCROLL LIGHT";
         if ("doom_dark".equals(t)) return "DOOM SCROLL DARK";
+        if ("soft_launch".equals(t)) return "SOFT LAUNCH";
+        if ("moth".equals(t)) return "MOTH TO A FLAME";
         if ("8bit".equals(t)) return "8-BIT";
         return "DARK";
     }
@@ -1705,7 +1717,7 @@ public class MainActivity extends Activity {
         pad(copy, 0, 6, 0, 12);
         content.addView(copy);
 
-        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "8bit"};
+        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "soft_launch", "moth", "8bit"};
         for (String theme : themes) {
             boolean selected = theme.equals(currentTheme());
             ThemePreviewView preview = new ThemePreviewView(this, theme, selected);
@@ -2206,9 +2218,15 @@ public class MainActivity extends Activity {
             String label = themeLabel(theme);
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setTextSize(dp(15));
-            paint.setTypeface("8bit".equals(theme)
-                ? Typeface.MONOSPACE
-                : Typeface.create("sans-serif", Typeface.BOLD));
+            if ("8bit".equals(theme)) {
+                paint.setTypeface(Typeface.MONOSPACE);
+            } else if ("soft_launch".equals(theme)) {
+                paint.setTypeface(Typeface.create("sans-serif-rounded", Typeface.BOLD));
+            } else if ("moth".equals(theme)) {
+                paint.setTypeface(Typeface.create("serif", Typeface.BOLD));
+            } else {
+                paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            }
             paint.setAntiAlias(!"8bit".equals(theme));
 
             int textColor = ThemeArt.foreground(theme, getResources());
