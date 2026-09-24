@@ -2361,23 +2361,88 @@ public class MainActivity extends Activity {
             ThemeArt.draw(canvas, getWidth(), blank, currentTheme(), getResources(), 4815162342L);
             canvas.restore();
 
-            int[] colors = useDarkPalette()
-                ? new int[]{bg, Color.rgb(84, 69, 92), Color.rgb(132, 82, 92), Color.rgb(171, 104, 85), Color.rgb(113, 76, 99), Color.rgb(51, 50, 69), Color.rgb(7, 8, 11)}
-                : new int[]{bg, Color.rgb(224, 205, 159), Color.rgb(213, 164, 123), Color.rgb(190, 126, 112), Color.rgb(157, 111, 131), Color.rgb(101, 88, 113), Color.rgb(48, 49, 67), Color.rgb(7, 8, 11)};
+            String theme = currentTheme();
+            int[] colors;
+            int deepColor;
+
+            if ("soft_launch".equals(theme)) {
+                colors = new int[]{
+                    bg,
+                    Color.rgb(235, 210, 204),
+                    Color.rgb(199, 158, 160),
+                    Color.rgb(137, 144, 116),
+                    Color.rgb(124, 94, 115),
+                    Color.rgb(65, 50, 65),
+                    Color.rgb(22, 17, 24)
+                };
+                deepColor = Color.rgb(22, 17, 24);
+            } else if ("moth".equals(theme)) {
+                colors = new int[]{
+                    bg,
+                    Color.rgb(42, 43, 57),
+                    Color.rgb(83, 72, 86),
+                    Color.rgb(113, 94, 88),
+                    Color.rgb(75, 82, 67),
+                    Color.rgb(35, 34, 42),
+                    Color.rgb(10, 11, 16)
+                };
+                deepColor = Color.rgb(10, 11, 16);
+            } else {
+                colors = useDarkPalette()
+                    ? new int[]{bg, Color.rgb(84, 69, 92), Color.rgb(132, 82, 92), Color.rgb(171, 104, 85), Color.rgb(113, 76, 99), Color.rgb(51, 50, 69), Color.rgb(7, 8, 11)}
+                    : new int[]{bg, Color.rgb(224, 205, 159), Color.rgb(213, 164, 123), Color.rgb(190, 126, 112), Color.rgb(157, 111, 131), Color.rgb(101, 88, 113), Color.rgb(48, 49, 67), Color.rgb(7, 8, 11)};
+                deepColor = Color.rgb(7, 8, 11);
+            }
 
             LinearGradient g = new LinearGradient(0, blank, 0, colorEnd, colors, null, Shader.TileMode.CLAMP);
             p.setShader(g);
             canvas.drawRect(0, blank, getWidth(), colorEnd, p);
             p.setShader(null);
 
-            p.setColor(Color.rgb(7, 8, 11));
+            p.setColor(deepColor);
             canvas.drawRect(0, colorEnd, getWidth(), h, p);
 
             Rect clip = canvas.getClipBounds();
-            for (float[] s : stars) {
-                if (s[1] < clip.top - dp(4) || s[1] > clip.bottom + dp(4)) continue;
-                p.setColor(Color.argb((int)(255 * s[3]), 245, 245, 243));
-                canvas.drawCircle(s[0], s[1], s[2], p);
+            if ("soft_launch".equals(theme)) {
+                int iconIndex = 0;
+                for (int i = 0; i < stars.size(); i += 4) {
+                    float[] s = stars.get(i);
+                    if (s[1] < clip.top - dp(18) || s[1] > clip.bottom + dp(18)) continue;
+                    float size = dp(4.2f) + s[2] * 1.25f;
+                    float rotation = ((i * 37) % 70) - 35f;
+                    ThemeArt.drawNativeFlower(
+                        canvas,
+                        s[0],
+                        s[1],
+                        size,
+                        iconIndex++ % 5,
+                        rotation,
+                        0.60f + s[3] * 0.36f
+                    );
+                }
+            } else if ("moth".equals(theme)) {
+                int iconIndex = 0;
+                for (int i = 0; i < stars.size(); i += 5) {
+                    float[] s = stars.get(i);
+                    if (s[1] < clip.top - dp(20) || s[1] > clip.bottom + dp(20)) continue;
+                    float size = dp(5.2f) + s[2] * 1.45f;
+                    float rotation = ((i * 29) % 64) - 32f;
+                    ThemeArt.drawCeramicMoth(
+                        canvas,
+                        s[0],
+                        s[1],
+                        size,
+                        iconIndex++ % 4,
+                        rotation,
+                        0.66f + s[3] * 0.30f
+                    );
+                }
+            } else {
+                for (float[] s : stars) {
+                    if (s[1] < clip.top - dp(4) || s[1] > clip.bottom + dp(4)) continue;
+                    p.setColor(Color.argb((int)(255 * s[3]), 245, 245, 243));
+                    canvas.drawCircle(s[0], s[1], s[2], p);
+                }
             }
         }
     }
