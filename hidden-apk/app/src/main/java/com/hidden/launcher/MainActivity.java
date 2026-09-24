@@ -1521,42 +1521,17 @@ public class MainActivity extends Activity {
         pad(title, 0, 14, 0, 8);
         content.addView(title);
 
-        TextView copy = text("HOME, DRAWER and HIDDEN can each have their own look. Pick a section, then tap the theme you want.", 15, muted);
+        TextView copy = text("One theme now runs the whole launcher: Home, drawer, Doom Scroll, HIDDEN, Settings and the matching wallpaper.", 15, muted);
         copy.setLineSpacing(0, 1.22f);
         content.addView(copy);
 
-        LinearLayout targets = new LinearLayout(this);
-        targets.setGravity(Gravity.CENTER);
-        String[] targetKeys = {"home_theme", "drawer_theme", "hidden_theme"};
-        String[] targetLabels = {"HOME", "DRAWER", "HIDDEN"};
-        for (int i = 0; i < targetKeys.length; i++) {
-            String key = targetKeys[i];
-            boolean selected = key.equals(onboardingThemeTarget);
-            TextView target = text(targetLabels[i], 12, selected ? fg : muted);
-            if (selected) applyStrongTypeface(target);
-            target.setGravity(Gravity.CENTER);
-            target.setBackgroundColor(selected ? panel : Color.TRANSPARENT);
-            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, dp(42), 1f);
-            if (i > 0) tp.leftMargin = dp(5);
-            targets.addView(target, tp);
-            target.setOnClickListener(v -> {
-                onboardingThemeTarget = key;
-                showOnboarding(2);
-            });
-        }
-        LinearLayout.LayoutParams targetLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
-        targetLp.topMargin = dp(18);
-        content.addView(targets, targetLp);
-
         String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "8bit"};
         for (String theme : themes) {
-            boolean selected = theme.equals(themeFor(onboardingThemeTarget));
+            boolean selected = theme.equals(currentTheme());
             ThemePreviewView preview = new ThemePreviewView(this, theme, selected);
             preview.setOnClickListener(v -> {
-                SharedPreferences.Editor e = prefs.edit().putString(onboardingThemeTarget, theme);
-                if ("drawer_theme".equals(onboardingThemeTarget)) e.putString("theme_mode", theme);
-                e.apply();
-                if ("drawer_theme".equals(onboardingThemeTarget)) applyPalette();
+                prefs.edit().putString("theme_mode", theme).apply();
+                applyPalette();
                 showOnboarding(2);
             });
             LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(78));
@@ -1565,7 +1540,7 @@ public class MainActivity extends Activity {
         }
 
         addSectionTitle(content, "SEAMLESS HOME");
-        TextView seamless = text("Use the wallpaper that exactly matches your HOME theme so Android's Home transition has the same surface to show.", 13, muted);
+        TextView seamless = text("Use HIDDEN's matching wallpaper so Android has the same surface to show during the Home transition.", 13, muted);
         seamless.setLineSpacing(0, 1.2f);
         content.addView(seamless);
 
@@ -1744,18 +1719,50 @@ public class MainActivity extends Activity {
         return "DARK";
     }
 
-    private String themeLabelFor(String key) {
-        return themeLabel(themeFor(key));
-    }
+    private void showThemePickerScreen() {
+        currentScreen = Screen.THEME_PICKER;
+        applyPalette();
 
-    private String nextThemeValue(String raw) {
-        String t = normaliseTheme(raw);
-        if ("light".equals(t)) return "dark";
-        if ("dark".equals(t)) return "oled";
-        if ("oled".equals(t)) return "doom_light";
-        if ("doom_light".equals(t)) return "doom_dark";
-        if ("doom_dark".equals(t)) return "8bit";
-        return "light";
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(bg);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        pad(content, 26, 42, 26, 38);
+        scroll.addView(content);
+
+        TextView title = heading("Theme", 34);
+        content.addView(title);
+
+        TextView copy = text("One theme applies everywhere in HIDDEN.", 14, muted);
+        pad(copy, 0, 6, 0, 12);
+        content.addView(copy);
+
+        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "8bit"};
+        for (String theme : themes) {
+            boolean selected = theme.equals(currentTheme());
+            ThemePreviewView preview = new ThemePreviewView(this, theme, selected);
+            preview.setOnClickListener(v -> {
+                prefs.edit().putString("theme_mode", theme).apply();
+                applyPalette();
+                showThemePickerScreen();
+            });
+            LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(82));
+            pp.topMargin = dp(9);
+            content.addView(preview, pp);
+        }
+
+        TextView wallpaper = boldAction("Set matching HIDDEN wallpaper");
+        pad(wallpaper, 0, 18, 0, 12);
+        wallpaper.setOnClickListener(v -> openHiddenWallpaperPicker());
+        content.addView(wallpaper);
+
+        TextView back = boldAction("‹ Settings");
+        back.setOnClickListener(v -> showSettings());
+        content.addView(back);
+
+        setContentView(scroll);
     }
 
     private void openHiddenWallpaperPicker() {
@@ -2461,14 +2468,7 @@ public class MainActivity extends Activity {
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setTextSize(dp(10));
 
-            int[] doomColors = {
-                Color.rgb(205, 146, 129),
-                Color.rgb(168, 174, 137),
-                Color.rgb(202, 171, 112),
-                Color.rgb(143, 139, 154),
-                Color.rgb(190, 154, 146),
-                Color.rgb(151, 168, 157)
-            };
+            int[] doomColors = doomAccentColors();
 
             float step = getHeight() / (float)letters.length();
             for (int i = 0; i < letters.length(); i++) {
@@ -2549,8 +2549,10 @@ public class MainActivity extends Activity {
             int colorEnd = Math.max(blank + 1, (int)(h * 0.78f));
 
             p.setShader(null);
-            p.setColor(bg);
-            canvas.drawRect(0, 0, getWidth(), blank, p);
+            canvas.save();
+            canvas.clipRect(0, 0, getWidth(), blank);
+            ThemeArt.draw(canvas, getWidth(), blank, currentTheme(), getResources(), 4815162342L);
+            canvas.restore();
 
             int[] colors = useDarkPalette()
                 ? new int[]{bg, Color.rgb(84, 69, 92), Color.rgb(132, 82, 92), Color.rgb(171, 104, 85), Color.rgb(113, 76, 99), Color.rgb(51, 50, 69), Color.rgb(7, 8, 11)}
@@ -2620,6 +2622,11 @@ public class MainActivity extends Activity {
             rebuild();
             notifyDataSetChanged();
             if (isSearchMode()) pinSearchResultsToTop();
+        }
+
+        void refreshApps() {
+            rebuild();
+            notifyDataSetChanged();
         }
 
         void clearSearchAndRestoreDrawer() {
@@ -2818,7 +2825,7 @@ public class MainActivity extends Activity {
                     TextView fine = hiddenLabel("fine.", 13, hp.muted, false);
                     pad(fine, 0, 2, 0, 8);
                     block.addView(fine);
-                } else if ("8bit".equals(prefs.getString("hidden_theme", "dark"))) {
+                } else if ("8bit".equals(currentTheme())) {
                     TextView ready = hiddenLabel("SECTOR 00 // READY_", 12, hp.muted, true);
                     pad(ready, 0, 2, 0, 8);
                     block.addView(ready);
@@ -2952,21 +2959,7 @@ public class MainActivity extends Activity {
         }
 
         private CharSequence earthyDoomText(String value) {
-            int[] colors = {
-                Color.rgb(205, 146, 129),
-                Color.rgb(168, 174, 137),
-                Color.rgb(202, 171, 112),
-                Color.rgb(143, 139, 154),
-                Color.rgb(190, 154, 146),
-                Color.rgb(151, 168, 157)
-            };
-
-            SpannableString s = new SpannableString(value);
-            for (int i = 0; i < value.length(); i++) {
-                if (Character.isWhitespace(value.charAt(i))) continue;
-                s.setSpan(new ForegroundColorSpan(colors[i % colors.length]), i, i + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
-            return s;
+            return globalStyledText(value);
         }
 
         private String glitchLabel(String label) {
