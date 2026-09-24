@@ -612,7 +612,8 @@ public class MainActivity extends Activity {
         info.setGravity(Gravity.CENTER);
 
         if (modeInDrawer("clock_mode")) {
-            TextView clock = heading(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 24);
+            TextView clock = text(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 14, fg);
+            applyStrongTypeface(clock);
             clock.setGravity(Gravity.CENTER);
             clock.setIncludeFontPadding(false);
             info.addView(clock, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
@@ -625,9 +626,9 @@ public class MainActivity extends Activity {
         }
 
         if (modeInDrawer("battery_mode")) {
-            TextView battery = text("BATTERY  " + batteryPercent() + "%", 11, muted);
+            TextView battery = text("BATTERY  " + batteryPercent() + "%", 14, muted);
             applyStrongTypeface(battery);
-            battery.setLetterSpacing(0.10f);
+            battery.setLetterSpacing(0.06f);
             battery.setGravity(Gravity.CENTER);
             info.addView(battery, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
         }
