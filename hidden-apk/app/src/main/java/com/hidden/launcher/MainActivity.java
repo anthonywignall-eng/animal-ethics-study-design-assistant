@@ -54,15 +54,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -661,7 +653,7 @@ public class MainActivity extends Activity {
         if (lm.findFirstVisibleItemPosition() != 0) return false;
 
         View home = lm.findViewByPosition(0);
-        return home != null && home.getTop() >= -dp(2);
+        return home != null && home.getTop() >= -dp(6);
     }
 
     private void openNotificationShadeFromHome() {
@@ -1043,50 +1035,6 @@ public class MainActivity extends Activity {
         return top;
     }
 
-    private String drawerUtilityText() {
-        List<String> bits = new ArrayList<>();
-        if (modeInDrawer("clock_mode")) bits.add(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()));
-        if (modeInDrawer("battery_mode")) bits.add("Battery " + batteryPercent() + "%");
-        return join(bits, "   ·   ");
-    }
-
-    private void renderDrawerWeather(TextView target) {
-        String city = prefs.getString("weather_place_label", "").trim();
-        if (city.isEmpty()) return;
-
-        final String timePart = modeInDrawer("clock_mode") ? new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()) : "";
-        final String batteryPart = modeInDrawer("battery_mode") ? "Battery " + batteryPercent() + "%" : "";
-
-        fetchWeatherValue(city, (ok, value) -> {
-            List<String> bits = new ArrayList<>();
-            if (!timePart.isEmpty()) bits.add(timePart);
-            if (!batteryPart.isEmpty()) bits.add(batteryPart);
-            bits.add(value);
-            if (target.getWindowToken() != null) target.setText(join(bits, "   ·   "));
-        });
-    }
-
-    private void renderWeather(TextView target) {
-        String place = prefs.getString("weather_place_label", "").trim();
-        if (place.isEmpty() || prefs.getString("weather_lat", "").isEmpty() || prefs.getString("weather_lon", "").isEmpty()) {
-            target.setText("Weather · choose a real place in HIDDEN Settings");
-            return;
-        }
-
-        String cached = cachedWeather();
-        target.setText(cached.isEmpty() ? place + " · checking weather" : cached);
-
-        fetchWeatherValue(place, (ok, value) -> {
-            if (target.getWindowToken() != null) target.setText(value);
-        });
-    }
-
-    private String cachedWeather() {
-        long at = prefs.getLong("last_weather_at", 0L);
-        if (System.currentTimeMillis() - at > 2L * 60L * 60L * 1000L) return "";
-        return prefs.getString("last_weather", "");
-    }
-
     private void showSettings() {
         showSettings(0);
     }
@@ -1176,7 +1124,7 @@ public class MainActivity extends Activity {
         defaultHomeStatusView = (TextView)homeRoleRow.getChildAt(1);
         content.addView(homeRoleRow);
 
-        TextView version = text("HIDDEN · v0.6.3", 12, muted);
+        TextView version = text("HIDDEN · v0.7", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -1875,195 +1823,6 @@ public class MainActivity extends Activity {
 
         prefs.edit().putString("hidden_entry_times", b.toString()).apply();
         return q.size() >= 3 && !doomPaused();
-    }
-
-    private interface WeatherCallback {
-        void onResult(boolean ok, String value);
-    }
-
-    static class PlaceChoice {
-        final String label;
-        final double lat;
-        final double lon;
-
-        PlaceChoice(String label, double lat, double lon) {
-            this.label = label;
-            this.lat = lat;
-            this.lon = lon;
-        }
-    }
-
-    private interface PlaceSearchCallback {
-        void onResult(List<PlaceChoice> places, String error);
-    }
-
-    private void chooseWeatherPlace(String query, EditText input, TextView status) {
-        status.setText("Searching…");
-        searchPlaces(query, (places, error) -> {
-            if (places.isEmpty()) {
-                status.setText(error == null ? "No matching places found." : error);
-                return;
-            }
-
-            String[] labels = new String[places.size()];
-            for (int i = 0; i < places.size(); i++) labels[i] = places.get(i).label;
-
-            new AlertDialog.Builder(MainActivity.this)
-                .setTitle("Choose weather place")
-                .setItems(labels, (dialog, which) -> {
-                    PlaceChoice p = places.get(which);
-                    prefs.edit()
-                        .putString("weather_city", p.label)
-                        .putString("weather_place_label", p.label)
-                        .putString("weather_lat", Double.toString(p.lat))
-                        .putString("weather_lon", Double.toString(p.lon))
-                        .remove("last_weather")
-                        .putLong("last_weather_at", 0L)
-                        .apply();
-
-                    input.setText(p.label);
-                    input.setSelection(input.length());
-                    status.setText("Selected · " + p.label + " · checking weather…");
-
-                    fetchWeatherValue(p.label, (ok, value) -> {
-                        status.setText(ok ? "Selected · " + value : value);
-                    });
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-        });
-    }
-
-    private void searchPlaces(String query, PlaceSearchCallback callback) {
-        new Thread(() -> {
-            List<PlaceChoice> places = new ArrayList<>();
-            String error = null;
-            try {
-                String q = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8.toString());
-                JSONObject geo = getJson("https://geocoding-api.open-meteo.com/v1/search?name=" + q + "&count=8&language=en&format=json");
-                JSONArray results = geo.optJSONArray("results");
-
-                if ((results == null || results.length() == 0) && query.contains(",")) {
-                    String fallback = query.split(",")[0].trim();
-                    q = URLEncoder.encode(fallback, StandardCharsets.UTF_8.toString());
-                    geo = getJson("https://geocoding-api.open-meteo.com/v1/search?name=" + q + "&count=8&language=en&format=json");
-                    results = geo.optJSONArray("results");
-                }
-
-                if (results != null) {
-                    for (int i = 0; i < results.length(); i++) {
-                        JSONObject place = results.getJSONObject(i);
-                        String name = place.optString("name", "");
-                        String admin = place.optString("admin1", "");
-                        String country = place.optString("country", "");
-                        if (name.isEmpty()) continue;
-
-                        StringBuilder label = new StringBuilder(name);
-                        if (!admin.isEmpty() && !admin.equalsIgnoreCase(name)) label.append(", ").append(admin);
-                        if (!country.isEmpty()) label.append(", ").append(country);
-
-                        places.add(new PlaceChoice(
-                            label.toString(),
-                            place.getDouble("latitude"),
-                            place.getDouble("longitude")
-                        ));
-                    }
-                }
-
-                if (places.isEmpty()) error = "No matching places found.";
-            } catch (Exception e) {
-                error = "Couldn't search places. Check your internet connection.";
-            }
-
-            String finalError = error;
-            runOnUiThread(() -> callback.onResult(places, finalError));
-        }).start();
-    }
-
-    private void fetchWeatherValue(String ignoredLabel, WeatherCallback callback) {
-        String latRaw = prefs.getString("weather_lat", "");
-        String lonRaw = prefs.getString("weather_lon", "");
-        String label = prefs.getString("weather_place_label", "").trim();
-
-        if (latRaw.isEmpty() || lonRaw.isEmpty() || label.isEmpty()) {
-            callback.onResult(false, "Choose a real weather place first.");
-            return;
-        }
-
-        new Thread(() -> {
-            boolean ok = false;
-            String result;
-            try {
-                double lat = Double.parseDouble(latRaw);
-                double lon = Double.parseDouble(lonRaw);
-                JSONObject forecast = getJson(
-                    "https://api.open-meteo.com/v1/forecast?latitude=" + lat +
-                    "&longitude=" + lon +
-                    "&current=temperature_2m,weather_code&timezone=auto&forecast_days=1"
-                );
-                JSONObject current = forecast.getJSONObject("current");
-                int temp = (int)Math.round(current.getDouble("temperature_2m"));
-                int code = current.optInt("weather_code", -1);
-
-                result = label + " · " + temp + "° · " + weatherLabel(code);
-                ok = true;
-                prefs.edit()
-                    .putString("last_weather", result)
-                    .putLong("last_weather_at", System.currentTimeMillis())
-                    .apply();
-            } catch (Exception e) {
-                result = label + " · weather unavailable";
-            }
-
-            boolean finalOk = ok;
-            String finalResult = result;
-            runOnUiThread(() -> callback.onResult(finalOk, finalResult));
-        }).start();
-    }
-
-    private JSONObject getJson(String address) throws Exception {
-        HttpURLConnection c = (HttpURLConnection)new URL(address).openConnection();
-        c.setConnectTimeout(7000);
-        c.setReadTimeout(7000);
-        c.setRequestProperty("Accept", "application/json");
-        c.setRequestProperty("User-Agent", "HiddenLauncher/0.4");
-
-        try {
-            int code = c.getResponseCode();
-            if (code < 200 || code > 299) throw new Exception("http");
-            BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
-            StringBuilder b = new StringBuilder();
-            String line;
-            while ((line = r.readLine()) != null) b.append(line);
-            r.close();
-            return new JSONObject(b.toString());
-        } finally {
-            c.disconnect();
-        }
-    }
-
-    private String weatherLabel(int code) {
-        if (code == 0) return "clear";
-        if (code == 1) return "mostly clear";
-        if (code == 2) return "partly cloudy";
-        if (code == 3) return "overcast";
-        if (code == 45 || code == 48) return "fog";
-        if (code >= 51 && code <= 57) return "drizzle";
-        if (code >= 61 && code <= 67) return "rain";
-        if (code >= 71 && code <= 77) return "snow";
-        if (code >= 80 && code <= 82) return "showers";
-        if (code == 85 || code == 86) return "snow showers";
-        if (code >= 95) return "storm";
-        return "weather";
-    }
-
-    private String join(List<String> parts, String sep) {
-        StringBuilder b = new StringBuilder();
-        for (int i = 0; i < parts.size(); i++) {
-            if (i > 0) b.append(sep);
-            b.append(parts.get(i));
-        }
-        return b.toString();
     }
 
     class ThemePatternDrawable extends Drawable {
@@ -2816,7 +2575,7 @@ public class MainActivity extends Activity {
                 HiddenPalette hp = hiddenPalette();
                 block.setBackgroundColor(hp.background);
 
-                String hiddenTheme = themeFor("hidden_theme");
+                String hiddenTheme = currentTheme();
                 boolean hiddenDoom = "doom_light".equals(hiddenTheme) || "doom_dark".equals(hiddenTheme);
                 TextView title = hiddenHeading(hiddenDoom ? "DOOM SCROLL" : "HIDDEN", 36, hp.foreground);
                 block.addView(title);
@@ -2872,7 +2631,7 @@ public class MainActivity extends Activity {
             t.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             t.setFontFeatureSettings("kern");
 
-            String theme = themeFor("hidden_theme");
+            String theme = currentTheme();
             if ("8bit".equals(theme)) {
                 t.setText(value.toUpperCase(Locale.ROOT));
                 t.setTypeface(Typeface.MONOSPACE, strong ? Typeface.BOLD : Typeface.NORMAL);
@@ -2891,7 +2650,7 @@ public class MainActivity extends Activity {
 
         private void styleHiddenText(TextView t, boolean strong) {
             String value = t.getText().toString();
-            String theme = themeFor("hidden_theme");
+            String theme = currentTheme();
             if ("8bit".equals(theme)) {
                 t.setText(value.toUpperCase(Locale.ROOT));
                 t.setTypeface(Typeface.MONOSPACE, strong ? Typeface.BOLD : Typeface.NORMAL);
@@ -2943,7 +2702,7 @@ public class MainActivity extends Activity {
             h.root.setBackgroundColor(hp.background);
             h.label.setTextColor(hp.foreground);
 
-            String theme = themeFor("hidden_theme");
+            String theme = currentTheme();
             if ("8bit".equals(theme)) {
                 h.label.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
                 h.label.getPaint().setAntiAlias(false);
@@ -3002,7 +2761,7 @@ public class MainActivity extends Activity {
     }
 
     private HiddenPalette hiddenPalette() {
-        String theme = themeFor("hidden_theme");
+        String theme = currentTheme();
         return new HiddenPalette(
             ThemeArt.background(theme, getResources()),
             ThemeArt.foreground(theme, getResources()),
