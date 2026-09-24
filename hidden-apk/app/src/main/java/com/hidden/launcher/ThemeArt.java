@@ -25,6 +25,8 @@ public final class ThemeArt {
             case "oled": return Color.BLACK;
             case "doom_light": return Color.rgb(245, 239, 226);
             case "doom_dark": return Color.rgb(5, 6, 6);
+            case "soft_launch": return Color.rgb(247, 238, 235);
+            case "moth": return Color.rgb(24, 21, 29);
             case "8bit": return Color.rgb(10, 14, 28);
             default: return Color.rgb(241, 239, 232);
         }
@@ -40,6 +42,10 @@ public final class ThemeArt {
                 return Color.rgb(244, 232, 180);
             case "doom_dark":
                 return Color.rgb(235, 218, 195);
+            case "soft_launch":
+                return Color.rgb(59, 43, 52);
+            case "moth":
+                return Color.rgb(239, 229, 214);
             default:
                 return Color.rgb(242, 242, 238);
         }
@@ -55,6 +61,10 @@ public final class ThemeArt {
                 return Color.rgb(154, 166, 124);
             case "doom_dark":
                 return Color.rgb(155, 145, 128);
+            case "soft_launch":
+                return Color.rgb(126, 101, 113);
+            case "moth":
+                return Color.rgb(166, 151, 139);
             default:
                 return Color.rgb(155, 155, 149);
         }
@@ -68,6 +78,8 @@ public final class ThemeArt {
             case "dark": return Color.rgb(31, 31, 31);
             case "oled": return Color.rgb(13, 13, 13);
             case "doom_dark": return Color.rgb(19, 17, 15);
+            case "soft_launch": return Color.rgb(235, 217, 218);
+            case "moth": return Color.rgb(40, 34, 46);
             case "8bit": return Color.rgb(20, 27, 45);
             default: return Color.rgb(31, 31, 31);
         }
@@ -81,6 +93,8 @@ public final class ThemeArt {
             case "dark": return Color.rgb(55, 55, 55);
             case "oled": return Color.rgb(38, 38, 38);
             case "doom_dark": return Color.rgb(62, 53, 44);
+            case "soft_launch": return Color.rgb(216, 194, 199);
+            case "moth": return Color.rgb(76, 65, 78);
             case "8bit": return Color.rgb(83, 96, 67);
             default: return Color.rgb(55, 55, 55);
         }
@@ -94,6 +108,10 @@ public final class ThemeArt {
             drawPaint(canvas, width, height, seed, false);
         } else if ("doom_dark".equals(theme)) {
             drawPaint(canvas, width, height, seed, true);
+        } else if ("soft_launch".equals(theme)) {
+            drawSoftPaper(canvas, width, height, seed);
+        } else if ("moth".equals(theme)) {
+            drawMothPaper(canvas, width, height, seed);
         } else if ("8bit".equals(theme)) {
             drawPixels(canvas, width, height, seed);
         }
