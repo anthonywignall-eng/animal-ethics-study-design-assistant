@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.role.RoleManager;
 import android.app.WallpaperManager;
+import android.app.WallpaperInfo;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -26,6 +27,7 @@ import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -47,6 +49,7 @@ import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -80,7 +83,7 @@ public class MainActivity extends Activity {
     private static final String MODE_OFF = "off";
     private static final long HALF_HOUR = 30L * 60L * 1000L;
     private static final long REPEAT_WINDOW = 2L * 60L * 1000L;
-    private static final int ONBOARDING_VERSION = 7;
+    private static final int ONBOARDING_VERSION = 8;
 
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -105,6 +108,7 @@ public class MainActivity extends Activity {
     private EditText flowDrawerSearch;
     private boolean syncingDrawerSearch = false;
     private boolean drawerSearchActive = false;
+    private boolean searchKeyboardDismissed = true;
 
     private TextView homeClockView;
     private TextView homeDateView;
@@ -114,6 +118,7 @@ public class MainActivity extends Activity {
     private TextView defaultHomeStatusView;
     private TextView favouriteCountView;
     private TextView hiddenCountView;
+    private TextView wallpaperStatusView;
     private boolean batteryReceiverRegistered = false;
     private boolean packageReceiverRegistered = false;
 
@@ -280,6 +285,9 @@ public class MainActivity extends Activity {
         if (hiddenCountView != null) {
             hiddenCountView.setText(selectedCount(hiddenSet()) + " HIDDEN");
         }
+        if (wallpaperStatusView != null) {
+            wallpaperStatusView.setText(isHiddenWallpaperActive() ? "ACTIVE ✓" : "NOT SET");
+        }
     }
 
     private String currentTimeText() {
@@ -319,7 +327,7 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (currentScreen == Screen.HOME && launcherRecycler != null) {
-            if (isDrawerSearchFocused()) {
+            if (launcherAdapter != null && launcherAdapter.isSearchMode() && !searchKeyboardDismissed) {
                 hideKeyboardKeepSearch();
                 return;
             }
@@ -377,6 +385,7 @@ public class MainActivity extends Activity {
         if (!prefs.contains("battery_mode")) e.putString("battery_mode", MODE_HOME);
         if (!prefs.contains("show_swipe_hint")) e.putBoolean("show_swipe_hint", true);
         if (!prefs.contains("doom_screens")) e.putInt("doom_screens", 18);
+        if (!prefs.contains("app_appearance")) e.putString("app_appearance", "text");
 
         e.putString("theme_mode", canonical)
             .remove("home_theme")
@@ -964,6 +973,7 @@ public class MainActivity extends Activity {
 
         search.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) {
+                searchKeyboardDismissed = false;
                 enterDrawerSearch();
 
                 if (inFlow && stickyDrawerSearch != null && stickyDrawerSearch != search) {
@@ -999,6 +1009,7 @@ public class MainActivity extends Activity {
     }
 
     private void hideKeyboardKeepSearch() {
+        searchKeyboardDismissed = true;
         View focused = getCurrentFocus();
         if (focused != null) {
             InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -1014,6 +1025,7 @@ public class MainActivity extends Activity {
     private void resetDrawerSearch() {
         hideKeyboardKeepSearch();
         drawerSearchActive = false;
+        searchKeyboardDismissed = true;
 
         syncingDrawerSearch = true;
         if (stickyDrawerSearch != null) stickyDrawerSearch.setText("");
