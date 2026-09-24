@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="hidden_wallpaper_description">Matches the HIDDEN launcher background for a seamless Home transition.</string>
+    <string name="hidden_accessibility_description">Allows a swipe down on HIDDEN Home to open Android notifications. HIDDEN does not read screen content.</string>
 </resources>
