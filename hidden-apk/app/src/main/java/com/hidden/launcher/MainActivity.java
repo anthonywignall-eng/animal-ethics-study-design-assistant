@@ -40,6 +40,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.view.ViewParent;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -156,6 +157,17 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (currentScreen == Screen.HOME && launcherRecycler != null) {
+            if (isDrawerSearchFocused()) {
+                hideKeyboardKeepSearch();
+                return;
+            }
+
+            if (launcherAdapter != null && launcherAdapter.isSearchMode()) {
+                resetDrawerSearch();
+                rewindHome(true);
+                return;
+            }
+
             LinearLayoutManager lm = (LinearLayoutManager) launcherRecycler.getLayoutManager();
             int first = lm == null ? 0 : lm.findFirstVisibleItemPosition();
             if (first > 0) {
@@ -401,6 +413,15 @@ public class MainActivity extends Activity {
         launcherRecycler.setItemAnimator(null);
         launcherAdapter = new LauncherAdapter();
         launcherRecycler.setAdapter(launcherAdapter);
+        launcherRecycler.setOnTouchListener((v, event) -> {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN &&
+                launcherAdapter != null &&
+                launcherAdapter.isSearchMode() &&
+                isDrawerSearchFocused()) {
+                hideKeyboardKeepSearch();
+            }
+            return false;
+        });
         frame.addView(launcherRecycler, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         drawerSearchActive = false;
@@ -433,6 +454,16 @@ public class MainActivity extends Activity {
 
         launcherRecycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
             boolean insideHidden = false;
+
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView rv, int newState) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING &&
+                    launcherAdapter != null &&
+                    launcherAdapter.isSearchMode() &&
+                    isDrawerSearchFocused()) {
+                    hideKeyboardKeepSearch();
+                }
+            }
 
             @Override
             public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
@@ -479,6 +510,11 @@ public class MainActivity extends Activity {
             showLauncherSurface(true);
             return;
         }
+
+        if (launcherAdapter != null && launcherAdapter.isSearchMode()) {
+            resetDrawerSearch();
+        }
+
         if (smooth) {
             launcherRecycler.stopScroll();
             launcherRecycler.smoothScrollToPosition(0);
@@ -723,6 +759,41 @@ public class MainActivity extends Activity {
         return shelf;
     }
 
+    private boolean isDrawerSearchFocused() {
+        return (stickyDrawerSearch != null && stickyDrawerSearch.hasFocus()) ||
+            (flowDrawerSearch != null && flowDrawerSearch.hasFocus());
+    }
+
+    private void hideKeyboardKeepSearch() {
+        View focused = getCurrentFocus();
+        if (focused != null) {
+            InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.hideSoftInputFromWindow(focused.getWindowToken(), 0);
+        }
+
+        if (stickyDrawerSearch != null) stickyDrawerSearch.clearFocus();
+        if (flowDrawerSearch != null) flowDrawerSearch.clearFocus();
+
+        if (launcherRecycler != null) launcherRecycler.requestFocus();
+    }
+
+    private void resetDrawerSearch() {
+        hideKeyboardKeepSearch();
+        drawerSearchActive = false;
+
+        syncingDrawerSearch = true;
+        if (stickyDrawerSearch != null) stickyDrawerSearch.setText("");
+        if (flowDrawerSearch != null) flowDrawerSearch.setText("");
+        syncingDrawerSearch = false;
+
+        if (launcherAdapter != null) {
+            launcherAdapter.clearSearchAndRestoreDrawer();
+        }
+
+        setAlphabetRailVisible(false);
+        setDrawerShelfVisible(false);
+    }
+
     private void enterDrawerSearch() {
         if (!drawerSearchActive) {
             drawerSearchActive = true;
@@ -938,7 +1009,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.6.1", 12, muted);
+        TextView version = text("HIDDEN · v0.6.2", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -1546,6 +1617,10 @@ public class MainActivity extends Activity {
     }
 
     private void launch(AppItem app) {
+        if (launcherAdapter != null && launcherAdapter.isSearchMode()) {
+            resetDrawerSearch();
+        }
+
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -2353,6 +2428,12 @@ public class MainActivity extends Activity {
             rebuild();
             notifyDataSetChanged();
             if (isSearchMode()) pinSearchResultsToTop();
+        }
+
+        void clearSearchAndRestoreDrawer() {
+            query = "";
+            rebuild();
+            notifyDataSetChanged();
         }
 
         boolean isSearchMode() {
