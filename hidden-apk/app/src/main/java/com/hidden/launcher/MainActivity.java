@@ -848,6 +848,7 @@ public class MainActivity extends Activity {
         addSectionTitle(content, "UTILITIES");
         content.addView(onboardingModeRow("Clock", "clock_mode"));
         content.addView(onboardingModeRow("Battery", "battery_mode"));
+    }
 
     private View onboardingModeRow(String label, String key) {
         LinearLayout block = new LinearLayout(this);
