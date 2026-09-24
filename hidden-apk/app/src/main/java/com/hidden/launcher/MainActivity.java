@@ -2331,8 +2331,8 @@ public class MainActivity extends Activity {
 
             boolean flowers = "soft_launch".equals(journeyTheme);
             boolean moths = "moth".equals(journeyTheme);
-            int count = flowers ? Math.max(24, zoneScreens * 12)
-                : moths ? Math.max(20, zoneScreens * 10)
+            int count = flowers ? Math.max(14, zoneScreens * 6)
+                : moths ? Math.max(14, zoneScreens * 6)
                 : Math.max(80, zoneScreens * 42);
 
             for (int i = 0; i < count; i++) {
@@ -2342,12 +2342,12 @@ public class MainActivity extends Activity {
                     ? 0.70f + random.nextFloat() * 0.30f
                     : 0.35f + random.nextFloat() * 0.65f;
                 float size = flowers
-                    ? dp(7f + random.nextFloat() * 7f)
+                    ? dp(15f + random.nextFloat() * 11f)
                     : moths
-                        ? dp(8f + random.nextFloat() * 8f)
+                        ? dp(13f + random.nextFloat() * 9f)
                         : dp(1f + random.nextFloat() * 1.4f);
-                float rotation = -35f + random.nextFloat() * 70f;
-                float type = random.nextInt(flowers ? 5 : moths ? 4 : 1);
+                float rotation = -28f + random.nextFloat() * 56f;
+                float type = random.nextInt(flowers ? 6 : moths ? 5 : 1);
                 decorations.add(new float[]{x, y, size, alpha, rotation, type});
             }
         }
@@ -2377,9 +2377,9 @@ public class MainActivity extends Activity {
             if ("soft_launch".equals(journeyTheme)) {
                 colors = new int[]{
                     bg,
-                    Color.rgb(236, 215, 218),
-                    Color.rgb(216, 181, 191),
-                    Color.rgb(177, 139, 158),
+                    Color.rgb(245, 204, 197),
+                    Color.rgb(226, 169, 171),
+                    Color.rgb(190, 128, 151),
                     Color.rgb(116, 91, 116),
                     Color.rgb(66, 55, 71),
                     Color.rgb(24, 21, 29)
@@ -2413,7 +2413,7 @@ public class MainActivity extends Activity {
 
             Rect clip = canvas.getClipBounds();
             for (float[] d : decorations) {
-                if (d[1] < clip.top - dp(24) || d[1] > clip.bottom + dp(24)) continue;
+                if (d[1] < clip.top - dp(56) || d[1] > clip.bottom + dp(56)) continue;
 
                 if ("soft_launch".equals(journeyTheme)) {
                     drawNativeFlower(canvas, d);
@@ -2437,70 +2437,166 @@ public class MainActivity extends Activity {
             canvas.rotate(d[4], x, y);
             p.setShader(null);
             p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeJoin(Paint.Join.ROUND);
 
-            if (type == 0) { // wattle
+            int leaf = Color.rgb(92, 119, 82);
+            int leafLight = Color.rgb(128, 148, 105);
+
+            if (type == 0) { // golden wattle spray
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(Math.max(1f, s * 0.10f));
-                p.setColor(Color.argb(alpha, 111, 129, 85));
-                canvas.drawLine(x - s * 0.55f, y + s * 0.55f, x + s * 0.35f, y - s * 0.45f, p);
+                p.setStrokeWidth(Math.max(1.5f, s * 0.075f));
+                p.setColor(Color.argb(alpha, Color.red(leaf), Color.green(leaf), Color.blue(leaf)));
+                Path stem = new Path();
+                stem.moveTo(x - s * 0.72f, y + s * 0.74f);
+                stem.cubicTo(x - s * 0.25f, y + s * 0.28f, x + s * 0.12f, y - s * 0.12f, x + s * 0.54f, y - s * 0.70f);
+                canvas.drawPath(stem, p);
 
+                // narrow eucalyptus-like leaves
                 p.setStyle(Paint.Style.FILL);
-                p.setColor(Color.argb(alpha, 222, 178, 65));
-                for (int i = 0; i < 6; i++) {
-                    float t = i / 5f;
-                    float cx = x - s * 0.32f + t * s * 0.68f;
-                    float cy = y + s * 0.28f - t * s * 0.70f;
-                    canvas.drawCircle(cx + (i % 2 == 0 ? -s * 0.14f : s * 0.14f), cy, s * 0.15f, p);
+                p.setColor(Color.argb(alpha, Color.red(leafLight), Color.green(leafLight), Color.blue(leafLight)));
+                canvas.save();
+                canvas.rotate(-28f, x - s * 0.20f, y + s * 0.15f);
+                canvas.drawOval(new RectF(x - s * 0.67f, y + s * 0.03f, x - s * 0.10f, y + s * 0.25f), p);
+                canvas.restore();
+                canvas.save();
+                canvas.rotate(28f, x + s * 0.16f, y - s * 0.25f);
+                canvas.drawOval(new RectF(x + s * 0.04f, y - s * 0.38f, x + s * 0.58f, y - s * 0.16f), p);
+                canvas.restore();
+
+                p.setColor(Color.argb(alpha, 228, 181, 57));
+                for (int i = 0; i < 9; i++) {
+                    float t = i / 8f;
+                    float cx = x - s * 0.42f + t * s * 0.82f;
+                    float cy = y + s * 0.33f - t * s * 0.92f;
+                    float side = (i % 2 == 0 ? -1f : 1f) * s * (0.17f + (i % 3) * 0.025f);
+                    canvas.drawCircle(cx + side, cy, s * 0.12f, p);
+                    p.setColor(Color.argb(Math.max(100, alpha - 45), 250, 214, 113));
+                    canvas.drawCircle(cx + side - s * 0.03f, cy - s * 0.03f, s * 0.045f, p);
+                    p.setColor(Color.argb(alpha, 228, 181, 57));
                 }
-            } else if (type == 1) { // gum blossom
+            } else if (type == 1) { // pink gum blossom with eucalyptus leaves
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb(alpha, Color.red(leaf), Color.green(leaf), Color.blue(leaf)));
+                canvas.save();
+                canvas.rotate(-31f, x, y);
+                canvas.drawOval(new RectF(x - s * 0.98f, y + s * 0.24f, x - s * 0.18f, y + s * 0.58f), p);
+                canvas.restore();
+                canvas.save();
+                canvas.rotate(33f, x, y);
+                canvas.drawOval(new RectF(x + s * 0.18f, y + s * 0.23f, x + s * 0.98f, y + s * 0.57f), p);
+                canvas.restore();
+
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(Math.max(1f, s * 0.075f));
-                p.setColor(Color.argb(alpha, 219, 137, 153));
-                for (int i = 0; i < 10; i++) {
-                    double a = (Math.PI * 2.0 * i) / 10.0;
-                    float ex = x + (float)Math.cos(a) * s * 0.72f;
-                    float ey = y + (float)Math.sin(a) * s * 0.72f;
+                p.setStrokeWidth(Math.max(1.2f, s * 0.055f));
+                for (int i = 0; i < 20; i++) {
+                    double a = (Math.PI * 2.0 * i) / 20.0;
+                    float len = s * (0.63f + ((i % 3) * 0.08f));
+                    float ex = x + (float)Math.cos(a) * len;
+                    float ey = y + (float)Math.sin(a) * len;
+                    p.setColor(Color.argb(alpha, 220 + (i % 2) * 12, 117 + (i % 3) * 12, 146 + (i % 2) * 18));
                     canvas.drawLine(x, y, ex, ey, p);
                 }
                 p.setStyle(Paint.Style.FILL);
-                p.setColor(Color.argb(alpha, 236, 188, 194));
-                canvas.drawCircle(x, y, s * 0.22f, p);
-                p.setColor(Color.argb(alpha, 116, 129, 87));
-                canvas.drawOval(new RectF(x - s * 0.36f, y + s * 0.20f, x + s * 0.36f, y + s * 0.52f), p);
+                p.setColor(Color.argb(alpha, 239, 177, 184));
+                canvas.drawCircle(x, y, s * 0.24f, p);
+                p.setColor(Color.argb(alpha, 239, 203, 118));
+                canvas.drawCircle(x, y, s * 0.09f, p);
             } else if (type == 2) { // billy button
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(Math.max(1f, s * 0.09f));
-                p.setColor(Color.argb(alpha, 101, 122, 79));
-                canvas.drawLine(x, y + s * 0.85f, x, y + s * 0.10f, p);
+                p.setStrokeWidth(Math.max(1.4f, s * 0.07f));
+                p.setColor(Color.argb(alpha, 92, 122, 77));
+                canvas.drawLine(x, y + s * 0.94f, x, y + s * 0.12f, p);
+
                 p.setStyle(Paint.Style.FILL);
-                p.setColor(Color.argb(alpha, 226, 181, 62));
-                canvas.drawCircle(x, y - s * 0.08f, s * 0.42f, p);
-                p.setColor(Color.argb(Math.max(80, alpha / 2), 255, 221, 121));
-                canvas.drawCircle(x - s * 0.12f, y - s * 0.20f, s * 0.10f, p);
+                p.setColor(Color.argb(alpha, 230, 181, 53));
+                canvas.drawCircle(x, y - s * 0.12f, s * 0.46f, p);
+                p.setColor(Color.argb(Math.max(110, alpha - 35), 252, 216, 111));
+                for (int row = -2; row <= 2; row++) {
+                    for (int col = -2; col <= 2; col++) {
+                        if (row * row + col * col > 5) continue;
+                        canvas.drawCircle(x + col * s * 0.105f, y - s * 0.15f + row * s * 0.10f, s * 0.035f, p);
+                    }
+                }
             } else if (type == 3) { // flannel flower
                 p.setStyle(Paint.Style.FILL);
-                p.setColor(Color.argb(alpha, 239, 231, 216));
-                for (int i = 0; i < 5; i++) {
+                for (int i = 0; i < 8; i++) {
                     canvas.save();
-                    canvas.rotate(i * 72f, x, y);
-                    canvas.drawOval(new RectF(x - s * 0.20f, y - s * 0.78f, x + s * 0.20f, y - s * 0.06f), p);
+                    canvas.rotate(i * 45f, x, y);
+                    p.setColor(Color.argb(alpha, 241, 234, 222));
+                    canvas.drawOval(new RectF(x - s * 0.17f, y - s * 0.82f, x + s * 0.17f, y - s * 0.05f), p);
+                    p.setStyle(Paint.Style.STROKE);
+                    p.setStrokeWidth(Math.max(1f, s * 0.032f));
+                    p.setColor(Color.argb(Math.max(95, alpha - 90), 170, 172, 147));
+                    canvas.drawLine(x, y - s * 0.17f, x, y - s * 0.66f, p);
+                    p.setStyle(Paint.Style.FILL);
                     canvas.restore();
                 }
-                p.setColor(Color.argb(alpha, 126, 141, 103));
-                canvas.drawCircle(x, y, s * 0.22f, p);
-            } else { // waratah
+                p.setColor(Color.argb(alpha, 119, 137, 96));
+                canvas.drawCircle(x, y, s * 0.24f, p);
+                p.setColor(Color.argb(alpha, 220, 193, 95));
+                canvas.drawCircle(x, y, s * 0.09f, p);
+            } else if (type == 4) { // waratah: dense crimson head with green bracts
                 p.setStyle(Paint.Style.FILL);
-                p.setColor(Color.argb(alpha, 187, 83, 91));
-                for (int i = 0; i < 8; i++) {
-                    double a = (Math.PI * 2.0 * i) / 8.0;
-                    float cx = x + (float)Math.cos(a) * s * 0.28f;
-                    float cy = y + (float)Math.sin(a) * s * 0.28f;
-                    canvas.drawOval(new RectF(cx - s * 0.22f, cy - s * 0.34f, cx + s * 0.22f, cy + s * 0.34f), p);
+                p.setColor(Color.argb(alpha, 82, 113, 76));
+                for (int i = 0; i < 7; i++) {
+                    canvas.save();
+                    canvas.rotate(-72f + i * 24f, x, y + s * 0.18f);
+                    canvas.drawOval(new RectF(x - s * 0.14f, y + s * 0.06f, x + s * 0.14f, y + s * 0.82f), p);
+                    canvas.restore();
                 }
-                p.setColor(Color.argb(alpha, 221, 139, 135));
-                canvas.drawCircle(x, y, s * 0.28f, p);
+
+                int[] reds = {
+                    Color.rgb(168, 54, 70),
+                    Color.rgb(190, 65, 79),
+                    Color.rgb(210, 87, 96)
+                };
+                for (int ring = 0; ring < 3; ring++) {
+                    int petals = 10 - ring * 2;
+                    float radius = s * (0.43f - ring * 0.10f);
+                    p.setColor(Color.argb(alpha, Color.red(reds[ring]), Color.green(reds[ring]), Color.blue(reds[ring])));
+                    for (int i = 0; i < petals; i++) {
+                        double a = (Math.PI * 2.0 * i) / petals + ring * 0.22;
+                        float cx = x + (float)Math.cos(a) * radius;
+                        float cy = y - s * 0.10f + (float)Math.sin(a) * radius * 0.80f;
+                        canvas.save();
+                        canvas.rotate((float)Math.toDegrees(a) + 90f, cx, cy);
+                        canvas.drawOval(new RectF(cx - s * 0.12f, cy - s * 0.28f, cx + s * 0.12f, cy + s * 0.28f), p);
+                        canvas.restore();
+                    }
+                }
+                p.setColor(Color.argb(alpha, 232, 128, 126));
+                canvas.drawCircle(x, y - s * 0.10f, s * 0.16f, p);
+            } else { // banksia cone and serrated leaves
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb(alpha, 75, 105, 70));
+                Path leftLeaf = new Path();
+                leftLeaf.moveTo(x - s * 0.18f, y + s * 0.30f);
+                leftLeaf.cubicTo(x - s * 0.70f, y + s * 0.12f, x - s * 1.00f, y + s * 0.48f, x - s * 0.78f, y + s * 0.72f);
+                leftLeaf.cubicTo(x - s * 0.54f, y + s * 0.88f, x - s * 0.27f, y + s * 0.62f, x - s * 0.18f, y + s * 0.30f);
+                canvas.drawPath(leftLeaf, p);
+                Path rightLeaf = new Path();
+                rightLeaf.moveTo(x + s * 0.18f, y + s * 0.30f);
+                rightLeaf.cubicTo(x + s * 0.70f, y + s * 0.12f, x + s * 1.00f, y + s * 0.48f, x + s * 0.78f, y + s * 0.72f);
+                rightLeaf.cubicTo(x + s * 0.54f, y + s * 0.88f, x + s * 0.27f, y + s * 0.62f, x + s * 0.18f, y + s * 0.30f);
+                canvas.drawPath(rightLeaf, p);
+
+                // characteristic upright cylindrical cone
+                p.setColor(Color.argb(alpha, 190, 126, 72));
+                RectF cone = new RectF(x - s * 0.36f, y - s * 0.83f, x + s * 0.36f, y + s * 0.43f);
+                canvas.drawRoundRect(cone, s * 0.30f, s * 0.30f, p);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(1f, s * 0.035f));
+                p.setColor(Color.argb(Math.max(130, alpha - 30), 232, 174, 111));
+                for (int row = 0; row < 7; row++) {
+                    float yy = y - s * 0.65f + row * s * 0.17f;
+                    for (int col = -1; col <= 1; col++) {
+                        float xx = x + col * s * 0.18f + (row % 2 == 0 ? s * 0.06f : 0f);
+                        canvas.drawOval(new RectF(xx - s * 0.06f, yy - s * 0.04f, xx + s * 0.06f, yy + s * 0.04f), p);
+                    }
+                }
             }
 
+            p.setStyle(Paint.Style.FILL);
             canvas.restore();
         }
 
@@ -2510,86 +2606,172 @@ public class MainActivity extends Activity {
             int type = (int)d[5];
 
             int[] wingColors = {
-                Color.rgb(185, 136, 113),
-                Color.rgb(201, 170, 157),
-                Color.rgb(139, 151, 121),
-                Color.rgb(164, 143, 174)
+                Color.rgb(112, 147, 156), // blue-green glaze
+                Color.rgb(191, 145, 117), // clay
+                Color.rgb(143, 153, 113), // olive
+                Color.rgb(159, 132, 169), // mauve
+                Color.rgb(171, 106, 91)   // rust
             };
+            int[] inlayColors = {
+                Color.rgb(213, 210, 184),
+                Color.rgb(226, 198, 168),
+                Color.rgb(204, 184, 151),
+                Color.rgb(201, 187, 209),
+                Color.rgb(214, 177, 151)
+            };
+
             int wing = wingColors[type % wingColors.length];
-            int outline = Color.rgb(232, 217, 194);
-            int body = Color.rgb(83, 68, 63);
+            int inlay = inlayColors[type % inlayColors.length];
+            int darkRim = Color.rgb(82, 60, 49);
+            int goldRim = Color.rgb(177, 136, 77);
+            int body = Color.rgb(73, 57, 52);
 
             canvas.save();
             canvas.rotate(d[4], x, y);
+            p.setShader(null);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeJoin(Paint.Join.ROUND);
+
+            float lowerDrop = (type == 0 || type == 3) ? s * 0.28f : 0f;
+            float upperSpread = (type == 2) ? 0.90f : 1.05f;
 
             Path left = new Path();
-            left.moveTo(x - s * 0.08f, y - s * 0.16f);
-            left.cubicTo(x - s * 0.35f, y - s * 0.80f, x - s * 1.05f, y - s * 0.72f, x - s * 0.92f, y - s * 0.08f);
-            left.cubicTo(x - s * 0.80f, y + s * 0.48f, x - s * 0.32f, y + s * 0.45f, x - s * 0.08f, y + s * 0.12f);
+            left.moveTo(x - s * 0.08f, y - s * 0.20f);
+            left.cubicTo(
+                x - s * 0.38f, y - s * 0.93f,
+                x - s * upperSpread, y - s * 0.78f,
+                x - s * 1.02f, y - s * 0.16f
+            );
+            left.cubicTo(
+                x - s * 0.98f, y + s * 0.26f,
+                x - s * 0.66f, y + s * (0.56f + lowerDrop / s),
+                x - s * 0.26f, y + s * 0.34f
+            );
+            if (lowerDrop > 0f) {
+                left.cubicTo(
+                    x - s * 0.18f, y + s * 0.72f,
+                    x - s * 0.42f, y + s * 0.92f,
+                    x - s * 0.08f, y + s * 0.44f
+                );
+            } else {
+                left.lineTo(x - s * 0.08f, y + s * 0.18f);
+            }
             left.close();
 
             Path right = new Path();
-            right.moveTo(x + s * 0.08f, y - s * 0.16f);
-            right.cubicTo(x + s * 0.35f, y - s * 0.80f, x + s * 1.05f, y - s * 0.72f, x + s * 0.92f, y - s * 0.08f);
-            right.cubicTo(x + s * 0.80f, y + s * 0.48f, x + s * 0.32f, y + s * 0.45f, x + s * 0.08f, y + s * 0.12f);
+            right.moveTo(x + s * 0.08f, y - s * 0.20f);
+            right.cubicTo(
+                x + s * 0.38f, y - s * 0.93f,
+                x + s * upperSpread, y - s * 0.78f,
+                x + s * 1.02f, y - s * 0.16f
+            );
+            right.cubicTo(
+                x + s * 0.98f, y + s * 0.26f,
+                x + s * 0.66f, y + s * (0.56f + lowerDrop / s),
+                x + s * 0.26f, y + s * 0.34f
+            );
+            if (lowerDrop > 0f) {
+                right.cubicTo(
+                    x + s * 0.18f, y + s * 0.72f,
+                    x + s * 0.42f, y + s * 0.92f,
+                    x + s * 0.08f, y + s * 0.44f
+                );
+            } else {
+                right.lineTo(x + s * 0.08f, y + s * 0.18f);
+            }
             right.close();
 
-            // Fake raised ceramic shadow.
+            // Raised ceramic shadow: deliberately stronger than a flat icon.
             canvas.save();
-            canvas.translate(s * 0.10f, s * 0.14f);
+            canvas.translate(s * 0.13f, s * 0.18f);
             p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.argb(Math.min(150, alpha / 2), 0, 0, 0));
+            p.setColor(Color.argb(Math.min(145, alpha / 2), 0, 0, 0));
             canvas.drawPath(left, p);
             canvas.drawPath(right, p);
             canvas.restore();
 
+            // Dark fired edge under the glaze.
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(2f, s * 0.19f));
+            p.setColor(Color.argb(alpha, Color.red(darkRim), Color.green(darkRim), Color.blue(darkRim)));
+            canvas.drawPath(left, p);
+            canvas.drawPath(right, p);
+
+            // Main coloured glaze.
             p.setStyle(Paint.Style.FILL);
             p.setColor(Color.argb(alpha, Color.red(wing), Color.green(wing), Color.blue(wing)));
             canvas.drawPath(left, p);
             canvas.drawPath(right, p);
 
+            // Warm hand-painted rim inside the dark ceramic edge.
             p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Math.max(1f, s * 0.08f));
-            p.setColor(Color.argb(alpha, Color.red(outline), Color.green(outline), Color.blue(outline)));
+            p.setStrokeWidth(Math.max(1.2f, s * 0.075f));
+            p.setColor(Color.argb(Math.min(235, alpha), Color.red(goldRim), Color.green(goldRim), Color.blue(goldRim)));
             canvas.drawPath(left, p);
             canvas.drawPath(right, p);
 
-            // Ceramic markings.
+            // Cream/stone inlays follow the upper wings like hand-painted ceramic.
             p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.argb(Math.min(220, alpha), 234, 216, 190));
-            canvas.drawCircle(x - s * 0.52f, y - s * 0.17f, s * 0.13f, p);
-            canvas.drawCircle(x + s * 0.52f, y - s * 0.17f, s * 0.13f, p);
+            p.setColor(Color.argb(Math.min(230, alpha), Color.red(inlay), Color.green(inlay), Color.blue(inlay)));
+            Path li = new Path();
+            li.moveTo(x - s * 0.20f, y - s * 0.25f);
+            li.cubicTo(x - s * 0.43f, y - s * 0.69f, x - s * 0.80f, y - s * 0.62f, x - s * 0.76f, y - s * 0.25f);
+            li.cubicTo(x - s * 0.67f, y - s * 0.03f, x - s * 0.38f, y + s * 0.08f, x - s * 0.20f, y - s * 0.05f);
+            li.close();
+            canvas.drawPath(li, p);
+            Path ri = new Path();
+            ri.moveTo(x + s * 0.20f, y - s * 0.25f);
+            ri.cubicTo(x + s * 0.43f, y - s * 0.69f, x + s * 0.80f, y - s * 0.62f, x + s * 0.76f, y - s * 0.25f);
+            ri.cubicTo(x + s * 0.67f, y - s * 0.03f, x + s * 0.38f, y + s * 0.08f, x + s * 0.20f, y - s * 0.05f);
+            ri.close();
+            canvas.drawPath(ri, p);
 
-            if (type % 2 == 0) {
-                p.setColor(Color.argb(Math.min(210, alpha), 92, 111, 88));
-                canvas.drawCircle(x - s * 0.66f, y + s * 0.10f, s * 0.08f, p);
-                canvas.drawCircle(x + s * 0.66f, y + s * 0.10f, s * 0.08f, p);
-            } else {
-                p.setColor(Color.argb(Math.min(210, alpha), 156, 88, 76));
-                canvas.drawCircle(x - s * 0.66f, y + s * 0.10f, s * 0.08f, p);
-                canvas.drawCircle(x + s * 0.66f, y + s * 0.10f, s * 0.08f, p);
-            }
+            // Decorative enamel dots/eyes and veins.
+            p.setColor(Color.argb(Math.min(230, alpha), 74, 82, 70));
+            float dotY = y - s * 0.17f;
+            canvas.drawCircle(x - s * 0.55f, dotY, s * 0.105f, p);
+            canvas.drawCircle(x + s * 0.55f, dotY, s * 0.105f, p);
+            p.setColor(Color.argb(Math.min(230, alpha), 226, 194, 126));
+            canvas.drawCircle(x - s * 0.55f, dotY, s * 0.046f, p);
+            canvas.drawCircle(x + s * 0.55f, dotY, s * 0.046f, p);
 
-            // Body and antennae.
+            int accent = (type % 2 == 0) ? Color.rgb(95, 118, 101) : Color.rgb(165, 91, 82);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1f, s * 0.045f));
+            p.setColor(Color.argb(Math.min(210, alpha), Color.red(accent), Color.green(accent), Color.blue(accent)));
+            canvas.drawLine(x - s * 0.25f, y - s * 0.03f, x - s * 0.76f, y + s * 0.20f, p);
+            canvas.drawLine(x + s * 0.25f, y - s * 0.03f, x + s * 0.76f, y + s * 0.20f, p);
+            canvas.drawLine(x - s * 0.31f, y + s * 0.13f, x - s * 0.58f, y + s * 0.36f, p);
+            canvas.drawLine(x + s * 0.31f, y + s * 0.13f, x + s * 0.58f, y + s * 0.36f, p);
+
+            // Central raised body, like a separate ceramic piece.
             p.setStyle(Paint.Style.FILL);
             p.setColor(Color.argb(alpha, Color.red(body), Color.green(body), Color.blue(body)));
-            canvas.drawOval(new RectF(x - s * 0.11f, y - s * 0.48f, x + s * 0.11f, y + s * 0.48f), p);
-            canvas.drawCircle(x, y - s * 0.50f, s * 0.13f, p);
+            canvas.drawOval(new RectF(x - s * 0.12f, y - s * 0.51f, x + s * 0.12f, y + s * 0.53f), p);
+            p.setColor(Color.argb(alpha, 161, 121, 76));
+            canvas.drawOval(new RectF(x - s * 0.052f, y - s * 0.39f, x + s * 0.052f, y + s * 0.37f), p);
+            p.setColor(Color.argb(alpha, Color.red(body), Color.green(body), Color.blue(body)));
+            canvas.drawCircle(x, y - s * 0.53f, s * 0.14f, p);
 
+            // Fine antennae.
             p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Math.max(1f, s * 0.055f));
-            p.setColor(Color.argb(alpha, 202, 183, 159));
-            canvas.drawLine(x - s * 0.04f, y - s * 0.58f, x - s * 0.28f, y - s * 0.88f, p);
-            canvas.drawLine(x + s * 0.04f, y - s * 0.58f, x + s * 0.28f, y - s * 0.88f, p);
+            p.setStrokeWidth(Math.max(1f, s * 0.048f));
+            p.setColor(Color.argb(alpha, 211, 188, 151));
+            canvas.drawLine(x - s * 0.04f, y - s * 0.61f, x - s * 0.29f, y - s * 0.91f, p);
+            canvas.drawLine(x + s * 0.04f, y - s * 0.61f, x + s * 0.29f, y - s * 0.91f, p);
 
-            // Glaze shine.
+            // Gloss catches on both wings make the surface read as glazed ceramic.
             p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Math.max(1f, s * 0.07f));
+            p.setStrokeWidth(Math.max(1.4f, s * 0.075f));
             p.setStrokeCap(Paint.Cap.ROUND);
-            p.setColor(Color.argb(Math.min(155, alpha), 255, 250, 238));
-            canvas.drawLine(x - s * 0.72f, y - s * 0.42f, x - s * 0.48f, y - s * 0.52f, p);
-            canvas.drawLine(x + s * 0.72f, y - s * 0.42f, x + s * 0.48f, y - s * 0.52f, p);
+            p.setColor(Color.argb(Math.min(175, alpha), 255, 249, 237));
+            canvas.drawLine(x - s * 0.72f, y - s * 0.47f, x - s * 0.47f, y - s * 0.57f, p);
+            canvas.drawLine(x + s * 0.72f, y - s * 0.47f, x + s * 0.47f, y - s * 0.57f, p);
+            p.setStrokeWidth(Math.max(1f, s * 0.04f));
+            canvas.drawLine(x - s * 0.78f, y - s * 0.35f, x - s * 0.68f, y - s * 0.39f, p);
+            canvas.drawLine(x + s * 0.78f, y - s * 0.35f, x + s * 0.68f, y - s * 0.39f, p);
 
+            p.setStyle(Paint.Style.FILL);
             canvas.restore();
         }
     }
