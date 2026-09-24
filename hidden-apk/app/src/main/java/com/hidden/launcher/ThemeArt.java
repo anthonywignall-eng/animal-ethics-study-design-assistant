@@ -165,6 +165,48 @@ public final class ThemeArt {
         }
     }
 
+    private static void drawSoftPaper(Canvas canvas, int width, int height, long seed) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Random random = new Random(seed ^ 0x51A7L);
+        int[] flecks = {
+            Color.rgb(196, 151, 160),
+            Color.rgb(181, 166, 142),
+            Color.rgb(151, 164, 139),
+            Color.rgb(177, 150, 179)
+        };
+
+        int count = Math.max(55, (width * height) / Math.max(1, width * 720));
+        for (int i = 0; i < count; i++) {
+            float x = random.nextFloat() * width;
+            float y = random.nextFloat() * height;
+            float r = Math.max(0.7f, Math.min(width, height) * (0.0006f + random.nextFloat() * 0.0012f));
+            p.setColor(flecks[random.nextInt(flecks.length)]);
+            p.setAlpha(24 + random.nextInt(28));
+            canvas.drawOval(new RectF(x - r * 1.6f, y - r, x + r * 1.6f, y + r), p);
+        }
+    }
+
+    private static void drawMothPaper(Canvas canvas, int width, int height, long seed) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Random random = new Random(seed ^ 0xA117L);
+        int[] flecks = {
+            Color.rgb(220, 199, 166),
+            Color.rgb(117, 102, 119),
+            Color.rgb(119, 128, 104),
+            Color.rgb(153, 112, 92)
+        };
+
+        int count = Math.max(50, (width * height) / Math.max(1, width * 760));
+        for (int i = 0; i < count; i++) {
+            float x = random.nextFloat() * width;
+            float y = random.nextFloat() * height;
+            float r = Math.max(0.7f, Math.min(width, height) * (0.0006f + random.nextFloat() * 0.0010f));
+            p.setColor(flecks[random.nextInt(flecks.length)]);
+            p.setAlpha(18 + random.nextInt(24));
+            canvas.drawCircle(x, y, r, p);
+        }
+    }
+
     private static void drawPixels(Canvas canvas, int width, int height, long seed) {
         Paint p = new Paint();
         Random random = new Random(seed);
