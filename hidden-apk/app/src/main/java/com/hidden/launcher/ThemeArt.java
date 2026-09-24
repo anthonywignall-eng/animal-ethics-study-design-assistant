@@ -166,6 +166,63 @@ public final class ThemeArt {
         }
     }
 
+    private static void drawSoftBotanical(Canvas canvas, int width, int height, long seed) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Random random = new Random(seed ^ 0x51A7L);
+        int count = Math.max(12, (width * height) / Math.max(1, width * width / 2));
+
+        int[] petalColors = {
+            Color.rgb(196, 119, 125),
+            Color.rgb(217, 159, 165),
+            Color.rgb(225, 185, 121),
+            Color.rgb(168, 136, 164),
+            Color.rgb(126, 146, 116)
+        };
+
+        for (int i = 0; i < count; i++) {
+            float x = random.nextFloat() * width;
+            float y = random.nextFloat() * height;
+            float r = Math.max(2f, Math.min(width, height) * (0.003f + random.nextFloat() * 0.0025f));
+
+            p.setColor(petalColors[random.nextInt(petalColors.length)]);
+            p.setAlpha(38 + random.nextInt(28));
+            int petals = 4 + random.nextInt(3);
+            for (int j = 0; j < petals; j++) {
+                double a = Math.PI * 2.0 * j / petals;
+                float px = x + (float)Math.cos(a) * r * 1.45f;
+                float py = y + (float)Math.sin(a) * r * 1.45f;
+                canvas.save();
+                canvas.rotate((float)(a * 180.0 / Math.PI), px, py);
+                canvas.drawOval(new RectF(px - r * 0.55f, py - r, px + r * 0.55f, py + r), p);
+                canvas.restore();
+            }
+            p.setAlpha(45);
+            p.setColor(Color.rgb(132, 117, 86));
+            canvas.drawCircle(x, y, r * 0.42f, p);
+        }
+    }
+
+    private static void drawMothPaper(Canvas canvas, int width, int height, long seed) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Random random = new Random(seed ^ 0x4D4F5448L);
+
+        int specks = Math.max(26, (width * height) / 26000);
+        int[] tones = {
+            Color.rgb(86, 75, 91),
+            Color.rgb(108, 91, 92),
+            Color.rgb(83, 91, 75),
+            Color.rgb(131, 116, 101)
+        };
+        for (int i = 0; i < specks; i++) {
+            p.setColor(tones[random.nextInt(tones.length)]);
+            p.setAlpha(18 + random.nextInt(20));
+            float x = random.nextFloat() * width;
+            float y = random.nextFloat() * height;
+            float r = 0.7f + random.nextFloat() * 1.8f;
+            canvas.drawCircle(x, y, r, p);
+        }
+    }
+
     private static void drawPixels(Canvas canvas, int width, int height, long seed) {
         Paint p = new Paint();
         Random random = new Random(seed);
