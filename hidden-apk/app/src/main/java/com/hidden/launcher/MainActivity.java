@@ -181,7 +181,12 @@ public class MainActivity extends Activity {
         refreshExternalStateViews();
 
         if (!batteryReceiverRegistered) {
-            registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            IntentFilter batteryFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(batteryReceiver, batteryFilter, Context.RECEIVER_EXPORTED);
+            } else {
+                registerReceiver(batteryReceiver, batteryFilter);
+            }
             batteryReceiverRegistered = true;
         }
 
@@ -423,9 +428,10 @@ public class MainActivity extends Activity {
         setPaletteValues(mode);
 
         boolean lightBars = "light".equals(mode) || "doom_light".equals(mode);
-        getWindow().getDecorView().setSystemUiVisibility(
-            lightBars ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : 0
-        );
+        int systemUi = lightBars
+            ? (View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR)
+            : 0;
+        getWindow().getDecorView().setSystemUiVisibility(systemUi);
         getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
         getWindow().setBackgroundDrawable(new ColorDrawable(bg));
@@ -434,6 +440,26 @@ public class MainActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private int drawerShelfHeight() {
+        float extraScale = Math.max(0f, getResources().getConfiguration().fontScale - 1f);
+        return dp(Math.round(148f + extraScale * 58f));
+    }
+
+    private int drawerInfoHeight() {
+        float extraScale = Math.max(0f, getResources().getConfiguration().fontScale - 1f);
+        return dp(Math.round(34f + extraScale * 15f));
+    }
+
+    private int drawerSearchHeight() {
+        float extraScale = Math.max(0f, getResources().getConfiguration().fontScale - 1f);
+        return dp(Math.round(46f + extraScale * 18f));
+    }
+
+    private int drawerSettingsHeight() {
+        float extraScale = Math.max(0f, getResources().getConfiguration().fontScale - 1f);
+        return dp(Math.round(42f + extraScale * 18f));
     }
 
     private int availableHeight() {
@@ -615,7 +641,7 @@ public class MainActivity extends Activity {
         drawerShelf.setVisibility(View.INVISIBLE);
         FrameLayout.LayoutParams shelfParams = new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(148),
+            drawerShelfHeight(),
             Gravity.TOP
         );
         frame.addView(drawerShelf, shelfParams);
@@ -625,7 +651,7 @@ public class MainActivity extends Activity {
         alphabetRail.setAlpha(0f);
         alphabetRail.setVisibility(View.INVISIBLE);
         FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(52), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END);
-        rp.topMargin = dp(158);
+        rp.topMargin = drawerShelfHeight() + dp(10);
         rp.bottomMargin = dp(18);
         frame.addView(alphabetRail, rp);
 
@@ -881,7 +907,8 @@ public class MainActivity extends Activity {
                 applyStrongTypeface(row);
                 pad(row, 0, 5, 0, 5);
                 row.setOnClickListener(v -> launch(app));
-                favourites.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+                row.setMinimumHeight(dp(48));
+                favourites.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             }
         }
 
@@ -936,7 +963,7 @@ public class MainActivity extends Activity {
             info.addView(battery, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
         }
 
-        shelf.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34)));
+        shelf.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, drawerInfoHeight()));
 
         EditText search = new EditText(this);
         search.setHint(isTheme("8bit") ? "SEARCH APPS_" : "Search apps");
@@ -959,7 +986,7 @@ public class MainActivity extends Activity {
 
         LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(46)
+            drawerSearchHeight()
         );
         searchParams.topMargin = dp(4);
         shelf.addView(search, searchParams);
@@ -999,7 +1026,7 @@ public class MainActivity extends Activity {
         settings.setGravity(Gravity.CENTER);
         settings.setLetterSpacing(0.12f);
         settings.setOnClickListener(v -> showSettings());
-        shelf.addView(settings, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+        shelf.addView(settings, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, drawerSettingsHeight()));
 
         View divider = new View(this);
         divider.setBackgroundColor(line);
@@ -1116,7 +1143,7 @@ public class MainActivity extends Activity {
         LinearLayout inFlowShelf = buildDrawerShelf(true);
         top.addView(inFlowShelf, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(148)
+            drawerShelfHeight()
         ));
 
         return top;
@@ -1247,6 +1274,7 @@ public class MainActivity extends Activity {
         right.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         left.setMaxLines(2);
         right.setMaxLines(2);
+        right.setMaxWidth(dp(180));
         right.setEllipsize(TextUtils.TruncateAt.END);
         row.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1286,6 +1314,7 @@ public class MainActivity extends Activity {
         right.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         left.setMaxLines(2);
         right.setMaxLines(2);
+        right.setMaxWidth(dp(180));
         right.setEllipsize(TextUtils.TruncateAt.END);
         row.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -2546,7 +2575,7 @@ public class MainActivity extends Activity {
         @Override public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
             if (type == TYPE_HOME) {
                 LinearLayout home = buildHomePanel();
-                home.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, availableHeight()));
+                home.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
                 return new SimpleHolder(home);
             }
             if (type == TYPE_HEADER) return new SimpleHolder(buildDrawerHeader());
@@ -2583,8 +2612,9 @@ public class MainActivity extends Activity {
             LinearLayout row = new LinearLayout(MainActivity.this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
-            pad(row, 26, 0, 58, 0);
+            row.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            row.setMinimumHeight(dp(54));
+            pad(row, 26, 5, 58, 5);
 
             TextView label = text("", 18, fg);
             label.setSingleLine(true);
@@ -2592,7 +2622,7 @@ public class MainActivity extends Activity {
             label.setEllipsize(TextUtils.TruncateAt.END);
             label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             label.setIncludeFontPadding(false);
-            row.addView(label, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            row.addView(label, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             return new AppHolder(row, label);
         }
 
@@ -2610,6 +2640,7 @@ public class MainActivity extends Activity {
                     applyRegularTypeface(h.label);
                 } else if (isDoomTheme()) {
                     h.label.setText(globalStyledText(app.label.toUpperCase(Locale.ROOT)));
+                    h.label.setShadowLayer(1.6f, 0f, 1f, isTheme("doom_light") ? Color.argb(120,255,250,238) : Color.argb(220,0,0,0));
                     applyStrongTypeface(h.label);
                 } else {
                     h.label.setText(app.label);
@@ -2771,6 +2802,7 @@ public class MainActivity extends Activity {
             } else if ("doom_light".equals(theme) || "doom_dark".equals(theme)) {
                 h.label.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
                 h.label.setText(earthyDoomText(app.label.toUpperCase(Locale.ROOT)));
+                h.label.setShadowLayer(1.6f, 0f, 1f, "doom_light".equals(theme) ? Color.argb(120,255,250,238) : Color.argb(220,0,0,0));
             } else {
                 h.label.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
                 h.label.setText(app.label);
