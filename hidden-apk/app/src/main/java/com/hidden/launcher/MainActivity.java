@@ -666,7 +666,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.3.2", 12, muted);
+        TextView version = text("HIDDEN · v0.3.3", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -1449,7 +1449,7 @@ public class MainActivity extends Activity {
         c.setConnectTimeout(7000);
         c.setReadTimeout(7000);
         c.setRequestProperty("Accept", "application/json");
-        c.setRequestProperty("User-Agent", "HiddenLauncher/0.3.2");
+        c.setRequestProperty("User-Agent", "HiddenLauncher/0.3.3");
 
         try {
             int code = c.getResponseCode();
@@ -1558,13 +1558,13 @@ public class MainActivity extends Activity {
 
         void start(Runnable done) {
             ValueAnimator a = ValueAnimator.ofFloat(0f, 1f);
-            a.setDuration(3300);
+            a.setDuration(5200);
             a.addUpdateListener(v -> {
                 progress = (float)v.getAnimatedValue();
                 invalidate();
             });
             a.start();
-            handler.postDelayed(done, 2800);
+            handler.postDelayed(done, 4650);
         }
 
         @Override protected void onDraw(Canvas c) {
@@ -1574,7 +1574,7 @@ public class MainActivity extends Activity {
             float phoneW = getWidth() * 0.58f;
             float phoneH = phoneW * 1.85f;
             float left = (getWidth() - phoneW) / 2f;
-            float top = getHeight() * 0.15f;
+            float top = getHeight() * 0.12f;
             RectF phone = new RectF(left, top, left + phoneW, top + phoneH);
 
             p.setStyle(Paint.Style.STROKE);
@@ -1582,12 +1582,18 @@ public class MainActivity extends Activity {
             p.setColor(fg);
             c.drawRoundRect(phone, dp(30), dp(30), p);
 
-            RectF screen = new RectF(phone.left + dp(10), phone.top + dp(18), phone.right - dp(10), phone.bottom - dp(18));
+            RectF screen = new RectF(
+                phone.left + dp(10),
+                phone.top + dp(18),
+                phone.right - dp(10),
+                phone.bottom - dp(18)
+            );
+
             p.setStyle(Paint.Style.FILL);
             p.setColor(bg);
             c.drawRoundRect(screen, dp(22), dp(22), p);
 
-            float explode = clamp((progress - 0.18f) / 0.45f);
+            float explode = clamp((progress - 0.07f) / 0.34f);
             int cols = 4;
             int rows = 5;
             float icon = phoneW * 0.13f;
@@ -1597,8 +1603,8 @@ public class MainActivity extends Activity {
             for (int r = 0; r < rows; r++) {
                 for (int col = 0; col < cols; col++) {
                     int idx = r * cols + col;
-                    float delay = idx / 26f;
-                    float local = clamp((explode - delay) * 2.2f);
+                    float delay = idx / 29f;
+                    float local = clamp((explode - delay) * 2.45f);
                     if (local >= 1f) continue;
 
                     float x = screen.left + xGap + col * (icon + xGap);
@@ -1613,8 +1619,14 @@ public class MainActivity extends Activity {
                         for (int b = 0; b < 7; b++) {
                             float ox = (random.nextFloat() - 0.5f) * dp(90) * local;
                             float oy = (random.nextFloat() - 0.5f) * dp(90) * local;
-                            float s = dp(3 + random.nextInt(4));
-                            c.drawRect(x + icon/2 + ox, y + icon/2 + oy, x + icon/2 + ox + s, y + icon/2 + oy + s, p);
+                            float bit = dp(3 + random.nextInt(4));
+                            c.drawRect(
+                                x + icon/2 + ox,
+                                y + icon/2 + oy,
+                                x + icon/2 + ox + bit,
+                                y + icon/2 + oy + bit,
+                                p
+                            );
                         }
                     }
                 }
@@ -1622,32 +1634,148 @@ public class MainActivity extends Activity {
 
             p.setAlpha(255);
 
-            float reveal = clamp((progress - 0.64f) / 0.26f);
+            float reveal = clamp((progress - 0.34f) / 0.16f);
+            float doom = clamp((progress - 0.50f) / 0.39f);
+
             if (reveal > 0f) {
-                float rise = dp(70) * (1f - reveal);
-                p.setColor(fg);
-                p.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-                p.setTextSize(dp(24));
-                c.drawText("4:38", screen.left + dp(20), screen.top + dp(56) + rise, p);
+                int save = c.save();
+                c.clipRoundRect(screen, dp(22), dp(22));
 
-                p.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
-                p.setTextSize(dp(10));
-                p.setColor(muted);
-                c.drawText("Thursday, 24 September", screen.left + dp(20), screen.top + dp(76) + rise, p);
-                c.drawText("Battery · 72%", screen.left + dp(20), screen.top + dp(100) + rise, p);
+                float sh = screen.height();
+                float worldH = sh * 6.5f;
+                float scrollY = easeInOut(doom) * (worldH - sh);
 
-                p.setColor(fg);
-                p.setTextSize(dp(12));
-                c.drawText("Phone", screen.left + dp(20), screen.bottom - dp(82) + rise, p);
-                c.drawText("Messages", screen.left + dp(20), screen.bottom - dp(58) + rise, p);
-                c.drawText("Camera", screen.left + dp(20), screen.bottom - dp(34) + rise, p);
+                drawIntroWorld(c, screen, sh, scrollY, reveal);
+
+                c.restoreToCount(save);
             }
 
-            if (progress > 0.82f) {
-                int alpha = (int)(255 * clamp((progress - 0.82f) / 0.18f));
+            if (progress > 0.88f) {
+                int alpha = (int)(255 * clamp((progress - 0.88f) / 0.12f));
                 p.setColor(Color.argb(alpha, Color.red(bg), Color.green(bg), Color.blue(bg)));
                 c.drawRect(0, 0, getWidth(), getHeight(), p);
             }
+        }
+
+        private void drawIntroWorld(Canvas c, RectF screen, float sh, float scrollY, float reveal) {
+            float x = screen.left;
+            float w = screen.width();
+
+            // HIDDEN home.
+            drawWorldRect(c, screen, 0f, sh, scrollY, bg);
+
+            float rise = dp(40) * (1f - reveal);
+            drawWorldText(c, screen, "4:38", x + dp(20), dp(58) + rise, scrollY, dp(24), fg, true);
+            drawWorldText(c, screen, "Thursday, 24 September", x + dp(20), dp(78) + rise, scrollY, dp(10), muted, false);
+            drawWorldText(c, screen, "Battery · 72%", x + dp(20), dp(102) + rise, scrollY, dp(10), muted, false);
+            drawWorldText(c, screen, "Phone", x + dp(20), sh - dp(84) + rise, scrollY, dp(12), fg, false);
+            drawWorldText(c, screen, "Messages", x + dp(20), sh - dp(60) + rise, scrollY, dp(12), fg, false);
+            drawWorldText(c, screen, "Camera", x + dp(20), sh - dp(36) + rise, scrollY, dp(12), fg, false);
+
+            // App drawer.
+            float drawerTop = sh;
+            drawWorldRect(c, screen, drawerTop, drawerTop + sh * 1.25f, scrollY, bg);
+            drawWorldText(c, screen, "HIDDEN Settings", x + dp(20), drawerTop + dp(46), scrollY, dp(13), fg, true);
+            String[] appNames = {"Calculator", "Camera", "Maps", "Messages", "Music", "Photos", "Weather"};
+            for (int i = 0; i < appNames.length; i++) {
+                drawWorldText(c, screen, appNames[i], x + dp(20), drawerTop + dp(86 + i * 34), scrollY, dp(12), fg, false);
+            }
+
+            // A little dead air before the colour journey.
+            float blankTop = sh * 2.25f;
+            float blankBottom = sh * 2.85f;
+            drawWorldRect(c, screen, blankTop, blankBottom, scrollY, bg);
+
+            // The HIDDEN colour journey.
+            float gradTop = blankBottom;
+            float gradBottom = sh * 5.25f;
+            float gy1 = screen.top + gradTop - scrollY;
+            float gy2 = screen.top + gradBottom - scrollY;
+
+            int[] rainbow = {
+                Color.rgb(224, 205, 159),
+                Color.rgb(214, 172, 116),
+                Color.rgb(196, 131, 115),
+                Color.rgb(172, 111, 137),
+                Color.rgb(133, 105, 145),
+                Color.rgb(91, 101, 135),
+                Color.rgb(55, 76, 106),
+                Color.rgb(20, 27, 42),
+                Color.rgb(6, 7, 10)
+            };
+
+            LinearGradient gradient = new LinearGradient(
+                0, gy1,
+                0, gy2,
+                rainbow,
+                null,
+                Shader.TileMode.CLAMP
+            );
+            p.setShader(gradient);
+            c.drawRect(screen.left, gy1, screen.right, gy2, p);
+            p.setShader(null);
+
+            // Space / stars.
+            float spaceTop = sh * 5.25f;
+            float spaceBottom = sh * 6.5f;
+            drawWorldRect(c, screen, spaceTop, spaceBottom, scrollY, Color.rgb(6, 7, 10));
+
+            random.setSeed(424242L);
+            for (int i = 0; i < 80; i++) {
+                float sx = screen.left + random.nextFloat() * w;
+                float wy = spaceTop + random.nextFloat() * (spaceBottom - spaceTop);
+                float sy = screen.top + wy - scrollY;
+                if (sy < screen.top || sy > screen.bottom) continue;
+
+                float radius = dp(0.7f) + random.nextFloat() * dp(1.0f);
+                int alpha = 120 + random.nextInt(136);
+                p.setColor(Color.argb(alpha, 246, 246, 242));
+                c.drawCircle(sx, sy, radius, p);
+            }
+
+            drawWorldText(c, screen, "HIDDEN", x + dp(20), sh * 6.08f, scrollY, dp(20), Color.rgb(245,245,242), true);
+            drawWorldText(c, screen, "Instagram", x + dp(20), sh * 6.18f, scrollY, dp(12), Color.rgb(225,225,220), false);
+            drawWorldText(c, screen, "Reddit", x + dp(20), sh * 6.25f, scrollY, dp(12), Color.rgb(225,225,220), false);
+            drawWorldText(c, screen, "YouTube", x + dp(20), sh * 6.32f, scrollY, dp(12), Color.rgb(225,225,220), false);
+        }
+
+        private void drawWorldRect(Canvas c, RectF screen, float worldTop, float worldBottom, float scrollY, int color) {
+            float top = screen.top + worldTop - scrollY;
+            float bottom = screen.top + worldBottom - scrollY;
+            if (bottom < screen.top || top > screen.bottom) return;
+
+            p.setShader(null);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(color);
+            c.drawRect(screen.left, top, screen.right, bottom, p);
+        }
+
+        private void drawWorldText(
+            Canvas c,
+            RectF screen,
+            String value,
+            float x,
+            float worldY,
+            float scrollY,
+            float textSize,
+            int color,
+            boolean bold
+        ) {
+            float y = screen.top + worldY - scrollY;
+            if (y < screen.top - dp(30) || y > screen.bottom + dp(30)) return;
+
+            p.setShader(null);
+            p.setColor(color);
+            p.setTypeface(Typeface.create("sans-serif", bold ? Typeface.BOLD : Typeface.NORMAL));
+            p.setTextSize(textSize);
+            c.drawText(value, x, y, p);
+        }
+
+        private float easeInOut(float t) {
+            t = clamp(t);
+            return t < 0.5f
+                ? 2f * t * t
+                : 1f - (float)Math.pow(-2f * t + 2f, 2f) / 2f;
         }
 
         private float clamp(float v) {
