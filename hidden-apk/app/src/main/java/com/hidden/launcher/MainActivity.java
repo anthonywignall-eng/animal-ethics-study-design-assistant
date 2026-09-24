@@ -2320,15 +2320,24 @@ public class MainActivity extends Activity {
 
         private void buildStars(int height) {
             int starStart = (int)(height * 0.78f);
-            int count = Math.max(80, (height - starStart) / Math.max(1, getResources().getDisplayMetrics().heightPixels) * 42);
+            int screen = Math.max(1, getResources().getDisplayMetrics().heightPixels);
+            String theme = currentTheme();
+            int perScreen = "soft_launch".equals(theme) ? 18 : ("moth".equals(theme) ? 15 : 42);
+            int minimum = "soft_launch".equals(theme) ? 34 : ("moth".equals(theme) ? 28 : 80);
+            int count = Math.max(minimum, (height - starStart) / screen * perScreen);
             int width = getResources().getDisplayMetrics().widthPixels;
 
             for (int i = 0; i < count; i++) {
                 float x = random.nextFloat() * width;
                 float y = starStart + random.nextFloat() * Math.max(1, height - starStart);
-                float r = dp(1) + random.nextFloat() * dp(1.4f);
-                float a = 0.35f + random.nextFloat() * 0.65f;
-                stars.add(new float[]{x, y, r, a});
+                float r;
+                if ("soft_launch".equals(theme)) r = dp(4.2f) + random.nextFloat() * dp(3.2f);
+                else if ("moth".equals(theme)) r = dp(5.2f) + random.nextFloat() * dp(3.2f);
+                else r = dp(1) + random.nextFloat() * dp(1.4f);
+                float a = 0.45f + random.nextFloat() * 0.55f;
+                float variant = random.nextInt(5);
+                float rotation = -24f + random.nextFloat() * 48f;
+                stars.add(new float[]{x, y, r, a, variant, rotation});
             }
         }
 
@@ -2352,24 +2361,187 @@ public class MainActivity extends Activity {
             ThemeArt.draw(canvas, getWidth(), blank, currentTheme(), getResources(), 4815162342L);
             canvas.restore();
 
-            int[] colors = useDarkPalette()
-                ? new int[]{bg, Color.rgb(84, 69, 92), Color.rgb(132, 82, 92), Color.rgb(171, 104, 85), Color.rgb(113, 76, 99), Color.rgb(51, 50, 69), Color.rgb(7, 8, 11)}
-                : new int[]{bg, Color.rgb(224, 205, 159), Color.rgb(213, 164, 123), Color.rgb(190, 126, 112), Color.rgb(157, 111, 131), Color.rgb(101, 88, 113), Color.rgb(48, 49, 67), Color.rgb(7, 8, 11)};
+            String journeyTheme = currentTheme();
+            int[] colors;
+            if ("soft_launch".equals(journeyTheme)) {
+                colors = new int[]{
+                    bg,
+                    Color.rgb(232, 210, 214),
+                    Color.rgb(213, 179, 187),
+                    Color.rgb(183, 148, 166),
+                    Color.rgb(132, 111, 139),
+                    Color.rgb(84, 72, 96),
+                    Color.rgb(50, 38, 56),
+                    Color.rgb(34, 25, 37)
+                };
+            } else if ("moth".equals(journeyTheme)) {
+                colors = new int[]{
+                    bg,
+                    Color.rgb(45, 40, 53),
+                    Color.rgb(69, 57, 67),
+                    Color.rgb(91, 69, 73),
+                    Color.rgb(69, 68, 61),
+                    Color.rgb(43, 43, 47),
+                    Color.rgb(20, 18, 25),
+                    Color.rgb(9, 8, 13)
+                };
+            } else {
+                colors = useDarkPalette()
+                    ? new int[]{bg, Color.rgb(84, 69, 92), Color.rgb(132, 82, 92), Color.rgb(171, 104, 85), Color.rgb(113, 76, 99), Color.rgb(51, 50, 69), Color.rgb(7, 8, 11)}
+                    : new int[]{bg, Color.rgb(224, 205, 159), Color.rgb(213, 164, 123), Color.rgb(190, 126, 112), Color.rgb(157, 111, 131), Color.rgb(101, 88, 113), Color.rgb(48, 49, 67), Color.rgb(7, 8, 11)};
+            }
 
             LinearGradient g = new LinearGradient(0, blank, 0, colorEnd, colors, null, Shader.TileMode.CLAMP);
             p.setShader(g);
             canvas.drawRect(0, blank, getWidth(), colorEnd, p);
             p.setShader(null);
 
-            p.setColor(Color.rgb(7, 8, 11));
+            int endColor = "soft_launch".equals(journeyTheme)
+                ? Color.rgb(34, 25, 37)
+                : ("moth".equals(journeyTheme) ? Color.rgb(9, 8, 13) : Color.rgb(7, 8, 11));
+            p.setColor(endColor);
             canvas.drawRect(0, colorEnd, getWidth(), h, p);
 
             Rect clip = canvas.getClipBounds();
             for (float[] s : stars) {
-                if (s[1] < clip.top - dp(4) || s[1] > clip.bottom + dp(4)) continue;
-                p.setColor(Color.argb((int)(255 * s[3]), 245, 245, 243));
-                canvas.drawCircle(s[0], s[1], s[2], p);
+                if (s[1] < clip.top - dp(18) || s[1] > clip.bottom + dp(18)) continue;
+
+                if ("soft_launch".equals(journeyTheme)) {
+                    drawNativeFlower(canvas, s);
+                } else if ("moth".equals(journeyTheme)) {
+                    drawCeramicMoth(canvas, s);
+                } else {
+                    p.setColor(Color.argb((int)(255 * s[3]), 245, 245, 243));
+                    canvas.drawCircle(s[0], s[1], s[2], p);
+                }
             }
+        }
+
+        private void drawNativeFlower(Canvas canvas, float[] item) {
+            float x = item[0], y = item[1], r = item[2], alpha = item[3];
+            int variant = (int)item[4];
+            float rotation = item[5];
+
+            canvas.save();
+            canvas.translate(x, y);
+            canvas.rotate(rotation);
+            p.setShader(null);
+            p.setStyle(Paint.Style.FILL);
+
+            if (variant == 0) {
+                // Golden wattle cluster.
+                p.setColor(Color.argb((int)(245 * alpha), 231, 186, 74));
+                for (int i = 0; i < 6; i++) {
+                    double a = Math.PI * 2.0 * i / 6.0;
+                    canvas.drawCircle((float)Math.cos(a) * r * 0.72f, (float)Math.sin(a) * r * 0.5f, r * 0.32f, p);
+                }
+                p.setColor(Color.argb((int)(210 * alpha), 114, 126, 86));
+                canvas.drawRect(-r * 0.08f, r * 0.2f, r * 0.08f, r * 1.25f, p);
+            } else if (variant == 1) {
+                // Flannel-flower style white star.
+                p.setColor(Color.argb((int)(230 * alpha), 238, 231, 217));
+                for (int i = 0; i < 6; i++) {
+                    canvas.save();
+                    canvas.rotate(i * 60f);
+                    canvas.drawOval(new RectF(-r * 0.34f, -r * 1.05f, r * 0.34f, -r * 0.05f), p);
+                    canvas.restore();
+                }
+                p.setColor(Color.argb((int)(230 * alpha), 150, 157, 112));
+                canvas.drawCircle(0, 0, r * 0.3f, p);
+            } else if (variant == 2) {
+                // Gum blossom.
+                p.setStrokeWidth(Math.max(1f, r * 0.12f));
+                p.setStyle(Paint.Style.STROKE);
+                p.setColor(Color.argb((int)(235 * alpha), 224, 135, 154));
+                for (int i = 0; i < 10; i++) {
+                    double a = Math.PI * 2.0 * i / 10.0;
+                    canvas.drawLine(0, 0, (float)Math.cos(a) * r, (float)Math.sin(a) * r, p);
+                }
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb((int)(245 * alpha), 236, 184, 190));
+                canvas.drawCircle(0, 0, r * 0.34f, p);
+            } else if (variant == 3) {
+                // Billy button.
+                p.setColor(Color.argb((int)(245 * alpha), 225, 173, 54));
+                canvas.drawCircle(0, -r * 0.2f, r * 0.72f, p);
+                p.setColor(Color.argb((int)(190 * alpha), 247, 211, 103));
+                canvas.drawCircle(-r * 0.2f, -r * 0.36f, r * 0.16f, p);
+                p.setColor(Color.argb((int)(210 * alpha), 111, 127, 83));
+                canvas.drawRect(-r * 0.07f, r * 0.45f, r * 0.07f, r * 1.25f, p);
+            } else {
+                // Waratah-inspired layered petals.
+                p.setColor(Color.argb((int)(235 * alpha), 198, 89, 102));
+                for (int i = 0; i < 7; i++) {
+                    canvas.save();
+                    canvas.rotate(i * (360f / 7f));
+                    canvas.drawOval(new RectF(-r * 0.30f, -r, r * 0.30f, r * 0.05f), p);
+                    canvas.restore();
+                }
+                p.setColor(Color.argb((int)(245 * alpha), 228, 137, 142));
+                canvas.drawCircle(0, 0, r * 0.34f, p);
+            }
+
+            canvas.restore();
+            p.setStyle(Paint.Style.FILL);
+        }
+
+        private void drawCeramicMoth(Canvas canvas, float[] item) {
+            float x = item[0], y = item[1], r = item[2], alpha = item[3];
+            int variant = (int)item[4];
+            float rotation = item[5];
+
+            int[] ceramics = {
+                Color.rgb(203, 177, 159),
+                Color.rgb(171, 151, 176),
+                Color.rgb(155, 164, 128),
+                Color.rgb(198, 151, 140),
+                Color.rgb(218, 202, 173)
+            };
+            int ceramic = ceramics[Math.max(0, Math.min(ceramics.length - 1, variant))];
+
+            canvas.save();
+            canvas.translate(x, y);
+            canvas.rotate(rotation);
+
+            // Little fridge-magnet shadow.
+            p.setColor(Color.argb((int)(95 * alpha), 0, 0, 0));
+            canvas.drawOval(new RectF(-r * 1.28f + dp(1.5f), -r * 0.55f + dp(2f), -r * 0.05f + dp(1.5f), r * 0.72f + dp(2f)), p);
+            canvas.drawOval(new RectF(r * 0.05f + dp(1.5f), -r * 0.55f + dp(2f), r * 1.28f + dp(1.5f), r * 0.72f + dp(2f)), p);
+
+            // Ceramic wings.
+            p.setColor(Color.argb((int)(245 * alpha), Color.red(ceramic), Color.green(ceramic), Color.blue(ceramic)));
+            canvas.drawOval(new RectF(-r * 1.32f, -r * 0.62f, -r * 0.05f, r * 0.68f), p);
+            canvas.drawOval(new RectF(r * 0.05f, -r * 0.62f, r * 1.32f, r * 0.68f), p);
+
+            // Lower wings.
+            int darker = Color.rgb(
+                Math.max(0, Color.red(ceramic) - 26),
+                Math.max(0, Color.green(ceramic) - 26),
+                Math.max(0, Color.blue(ceramic) - 26)
+            );
+            p.setColor(Color.argb((int)(230 * alpha), Color.red(darker), Color.green(darker), Color.blue(darker)));
+            canvas.drawOval(new RectF(-r * 0.9f, r * 0.15f, -r * 0.02f, r * 0.95f), p);
+            canvas.drawOval(new RectF(r * 0.02f, r * 0.15f, r * 0.9f, r * 0.95f), p);
+
+            // Body and antennae.
+            p.setColor(Color.argb((int)(245 * alpha), 83, 69, 65));
+            canvas.drawOval(new RectF(-r * 0.13f, -r * 0.72f, r * 0.13f, r * 0.88f), p);
+            p.setStrokeWidth(Math.max(1f, r * 0.08f));
+            p.setStyle(Paint.Style.STROKE);
+            canvas.drawLine(-r * 0.05f, -r * 0.68f, -r * 0.5f, -r * 1.02f, p);
+            canvas.drawLine(r * 0.05f, -r * 0.68f, r * 0.5f, -r * 1.02f, p);
+            p.setStyle(Paint.Style.FILL);
+
+            // Glaze highlight and tiny painted wing marks.
+            p.setColor(Color.argb((int)(90 * alpha), 255, 255, 248));
+            canvas.drawOval(new RectF(-r * 0.95f, -r * 0.42f, -r * 0.42f, -r * 0.08f), p);
+            canvas.drawOval(new RectF(r * 0.42f, -r * 0.42f, r * 0.95f, -r * 0.08f), p);
+
+            p.setColor(Color.argb((int)(150 * alpha), 91, 78, 76));
+            canvas.drawCircle(-r * 0.62f, r * 0.10f, r * 0.11f, p);
+            canvas.drawCircle(r * 0.62f, r * 0.10f, r * 0.11f, p);
+
+            canvas.restore();
         }
     }
 
@@ -2704,6 +2876,14 @@ public class MainActivity extends Activity {
                 if (strong) {
                     t.setShadowLayer(1.6f, 0f, 1f, "doom_light".equals(theme) ? Color.argb(120,255,250,238) : Color.argb(220,0,0,0));
                 }
+            } else if ("soft_launch".equals(theme)) {
+                t.setText(value);
+                t.setTypeface(Typeface.create("sans-serif-rounded", strong ? Typeface.BOLD : Typeface.NORMAL));
+                t.setLetterSpacing(strong ? 0.018f : 0.012f);
+            } else if ("moth".equals(theme)) {
+                t.setText(value);
+                t.setTypeface(strong ? Typeface.create("serif", Typeface.BOLD) : Typeface.create("sans-serif", Typeface.NORMAL));
+                t.setLetterSpacing(strong ? 0.025f : 0.018f);
             } else {
                 t.setText(value);
                 t.setTypeface(Typeface.create("sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
@@ -2721,6 +2901,10 @@ public class MainActivity extends Activity {
             } else if ("doom_light".equals(theme) || "doom_dark".equals(theme)) {
                 t.setText(earthyDoomText(value));
                 t.setTypeface(Typeface.create("sans-serif-condensed", strong ? Typeface.BOLD : Typeface.NORMAL));
+            } else if ("soft_launch".equals(theme)) {
+                t.setTypeface(Typeface.create("sans-serif-rounded", strong ? Typeface.BOLD : Typeface.NORMAL));
+            } else if ("moth".equals(theme)) {
+                t.setTypeface(strong ? Typeface.create("serif", Typeface.BOLD) : Typeface.create("sans-serif", Typeface.NORMAL));
             } else {
                 t.setTypeface(Typeface.create("sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
             }
@@ -2775,6 +2959,14 @@ public class MainActivity extends Activity {
                 h.label.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
                 h.label.setText(earthyDoomText(app.label.toUpperCase(Locale.ROOT)));
                 h.label.setShadowLayer(1.6f, 0f, 1f, "doom_light".equals(theme) ? Color.argb(120,255,250,238) : Color.argb(220,0,0,0));
+            } else if ("soft_launch".equals(theme)) {
+                h.label.setTypeface(Typeface.create("sans-serif-rounded", Typeface.NORMAL));
+                h.label.setLetterSpacing(0.012f);
+                h.label.setText(app.label);
+            } else if ("moth".equals(theme)) {
+                h.label.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+                h.label.setLetterSpacing(0.018f);
+                h.label.setText(app.label);
             } else {
                 h.label.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
                 h.label.setText(app.label);
