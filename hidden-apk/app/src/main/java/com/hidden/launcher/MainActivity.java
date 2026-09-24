@@ -526,6 +526,11 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout buildHomePanel() {
+        String previousTheme = renderThemeOverride;
+        int oldBg = bg, oldFg = fg, oldMuted = muted, oldPanel = panel, oldLine = line;
+        renderThemeOverride = themeFor("home_theme");
+        setPaletteValues(renderThemeOverride);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(bg);
@@ -595,6 +600,12 @@ public class MainActivity extends Activity {
             arrow.setOnClickListener(v -> launcherRecycler.smoothScrollToPosition(1));
         }
 
+        renderThemeOverride = previousTheme;
+        bg = oldBg;
+        fg = oldFg;
+        muted = oldMuted;
+        panel = oldPanel;
+        line = oldLine;
         return root;
     }
 
