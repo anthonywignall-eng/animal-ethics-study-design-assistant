@@ -523,6 +523,11 @@ public class MainActivity extends Activity {
         frame.addView(launcherRecycler, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         drawerSearchActive = false;
+        homeClockView = null;
+        homeDateView = null;
+        homeBatteryView = null;
+        drawerClockViews.clear();
+        drawerBatteryViews.clear();
         stickyDrawerSearch = null;
         flowDrawerSearch = null;
         drawerShelf = buildDrawerShelf(false);
@@ -739,14 +744,9 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout buildHomePanel() {
-        String previousTheme = renderThemeOverride;
-        int oldBg = bg, oldFg = fg, oldMuted = muted, oldPanel = panel, oldLine = line;
-        renderThemeOverride = themeFor("home_theme");
-        setPaletteValues(renderThemeOverride);
-
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackground(new ThemePatternDrawable(renderThemeOverride, 4815162342L));
+        root.setBackground(new ThemePatternDrawable(currentTheme(), 4815162342L));
         root.setMinimumHeight(availableHeight());
         pad(root, 28, 42, 28, 20);
 
@@ -759,11 +759,13 @@ public class MainActivity extends Activity {
 
         if (hasClock) {
             TextView time = heading(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 68);
+            homeClockView = time;
             time.setGravity(Gravity.CENTER);
             time.setIncludeFontPadding(false);
             utilityBlock.addView(time, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(78)));
 
             TextView date = text(new SimpleDateFormat("EEEE · d MMMM", Locale.getDefault()).format(new Date()), 14, muted);
+            homeDateView = date;
             date.setGravity(Gravity.CENTER);
             date.setLetterSpacing(0.035f);
             utilityBlock.addView(date, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28)));
@@ -771,6 +773,7 @@ public class MainActivity extends Activity {
 
         if (hasBattery) {
             TextView battery = text("BATTERY  " + batteryPercent() + "%", 12, muted);
+            homeBatteryView = battery;
             battery.setGravity(Gravity.CENTER);
             applyStrongTypeface(battery);
             battery.setLetterSpacing(0.12f);
@@ -813,12 +816,6 @@ public class MainActivity extends Activity {
             arrow.setOnClickListener(v -> launcherRecycler.smoothScrollToPosition(1));
         }
 
-        renderThemeOverride = previousTheme;
-        bg = oldBg;
-        fg = oldFg;
-        muted = oldMuted;
-        panel = oldPanel;
-        line = oldLine;
         return root;
     }
 
@@ -838,6 +835,7 @@ public class MainActivity extends Activity {
 
         if (modeInDrawer("clock_mode")) {
             TextView clock = text(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 14, fg);
+            drawerClockViews.add(clock);
             applyStrongTypeface(clock);
             clock.setGravity(Gravity.CENTER);
             clock.setIncludeFontPadding(false);
@@ -852,6 +850,7 @@ public class MainActivity extends Activity {
 
         if (modeInDrawer("battery_mode")) {
             TextView battery = text("BATTERY  " + batteryPercent() + "%", 14, muted);
+            drawerBatteryViews.add(battery);
             applyStrongTypeface(battery);
             battery.setLetterSpacing(0.06f);
             battery.setGravity(Gravity.CENTER);
@@ -1094,6 +1093,8 @@ public class MainActivity extends Activity {
 
     private void showSettings(int restoreY) {
         currentScreen = Screen.SETTINGS;
+        accessibilityStatusView = null;
+        defaultHomeStatusView = null;
         applyPalette();
 
         ScrollView scroll = new ScrollView(this);
@@ -1138,11 +1139,15 @@ public class MainActivity extends Activity {
 
         addSectionTitle(content, "HOME");
         content.addView(toggleRow("Swipe-up hint", "show_swipe_hint"));
-        content.addView(actionRow(
+
+        LinearLayout accessibilityRow = (LinearLayout)actionRow(
             "Swipe down notifications",
             HiddenAccessibilityService.isConnected() ? "ON" : "SET UP",
             v -> openAccessibilitySetup()
-        ));
+        );
+        accessibilityStatusView = (TextView)accessibilityRow.getChildAt(1);
+        content.addView(accessibilityRow);
+
         TextView accessibilityNote = text("Optional Accessibility access is used only to open Android's notification shade from a Home-screen swipe. HIDDEN does not retrieve screen content.", 12, muted);
         accessibilityNote.setLineSpacing(0, 1.18f);
         pad(accessibilityNote, 0, 2, 0, 8);
@@ -1153,28 +1158,8 @@ public class MainActivity extends Activity {
         content.addView(actionRow("HIDDEN apps", selectedCount(hiddenSet()) + " hidden", v -> showAppPicker(false)));
         content.addView(actionRow("Review notifications", "Android settings", v -> showNotificationReview()));
 
-        addSectionTitle(content, "THEMES");
-        content.addView(cycleRow("HOME theme", themeLabelFor("home_theme"), v -> {
-            String next = nextThemeValue(themeFor("home_theme"));
-            prefs.edit().putString("home_theme", next).apply();
-            if (v instanceof LinearLayout && ((LinearLayout)v).getChildCount() > 1) {
-                ((TextView)((LinearLayout)v).getChildAt(1)).setText(themeLabel(next));
-            }
-        }));
-        content.addView(cycleRow("DRAWER theme", themeLabelFor("drawer_theme"), v -> {
-            int y = scroll.getScrollY();
-            String next = nextThemeValue(themeFor("drawer_theme"));
-            prefs.edit().putString("drawer_theme", next).putString("theme_mode", next).apply();
-            applyPalette();
-            showSettings(y);
-        }));
-        content.addView(cycleRow("HIDDEN theme", themeLabelFor("hidden_theme"), v -> {
-            String next = nextThemeValue(themeFor("hidden_theme"));
-            prefs.edit().putString("hidden_theme", next).apply();
-            if (v instanceof LinearLayout && ((LinearLayout)v).getChildCount() > 1) {
-                ((TextView)((LinearLayout)v).getChildAt(1)).setText(themeLabel(next));
-            }
-        }));
+        addSectionTitle(content, "APPEARANCE");
+        content.addView(actionRow("Theme", themeLabel(currentTheme()), v -> showThemePickerScreen()));
         content.addView(actionRow("Seamless Home", "matching wallpaper", v -> openHiddenWallpaperPicker()));
 
         addSectionTitle(content, "ABOUT HIDDEN");
@@ -1187,7 +1172,9 @@ public class MainActivity extends Activity {
         content.addView(offline);
 
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
-        content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
+        LinearLayout homeRoleRow = (LinearLayout)actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "CHANGE", v -> requestHomeRole());
+        defaultHomeStatusView = (TextView)homeRoleRow.getChildAt(1);
+        content.addView(homeRoleRow);
 
         TextView version = text("HIDDEN · v0.6.3", 12, muted);
         pad(version, 0, 26, 0, 0);
@@ -1234,8 +1221,13 @@ public class MainActivity extends Activity {
         TextView left = text(label, 17, fg);
         TextView right = text(modeLabel(prefs.getString(key, MODE_OFF)), 13, muted);
         right.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        row.addView(left, new LinearLayout.LayoutParams(0, dp(50), 1f));
-        row.addView(right, new LinearLayout.LayoutParams(dp(110), dp(50)));
+        left.setMaxLines(2);
+        right.setMaxLines(2);
+        right.setEllipsize(TextUtils.TruncateAt.END);
+        row.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rp.leftMargin = dp(12);
+        row.addView(right, rp);
         row.setOnClickListener(v -> {
             String next = nextMode(prefs.getString(key, MODE_OFF));
             prefs.edit().putString(key, next).apply();
@@ -1249,8 +1241,12 @@ public class MainActivity extends Activity {
         TextView left = text(label, 17, fg);
         TextView right = text(prefs.getBoolean(key, true) ? "ON" : "OFF", 13, muted);
         right.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        row.addView(left, new LinearLayout.LayoutParams(0, dp(50), 1f));
-        row.addView(right, new LinearLayout.LayoutParams(dp(90), dp(50)));
+        left.setMaxLines(2);
+        right.setMaxLines(2);
+        row.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rp.leftMargin = dp(12);
+        row.addView(right, rp);
         row.setOnClickListener(v -> {
             boolean next = !prefs.getBoolean(key, true);
             prefs.edit().putBoolean(key, next).apply();
@@ -1264,8 +1260,13 @@ public class MainActivity extends Activity {
         TextView left = text(label, 17, fg);
         TextView right = text(value, 13, muted);
         right.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        row.addView(left, new LinearLayout.LayoutParams(0, dp(50), 1f));
-        row.addView(right, new LinearLayout.LayoutParams(dp(160), dp(50)));
+        left.setMaxLines(2);
+        right.setMaxLines(2);
+        right.setEllipsize(TextUtils.TruncateAt.END);
+        row.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rp.leftMargin = dp(12);
+        row.addView(right, rp);
         row.setOnClickListener(listener);
         return row;
     }
@@ -1275,8 +1276,13 @@ public class MainActivity extends Activity {
         TextView left = text(label, 17, fg);
         TextView right = text(value, 13, muted);
         right.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        row.addView(left, new LinearLayout.LayoutParams(0, dp(50), 1f));
-        row.addView(right, new LinearLayout.LayoutParams(dp(160), dp(50)));
+        left.setMaxLines(2);
+        right.setMaxLines(2);
+        right.setEllipsize(TextUtils.TruncateAt.END);
+        row.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rp.leftMargin = dp(12);
+        row.addView(right, rp);
         if (listener != null) row.setOnClickListener(listener);
         return row;
     }
@@ -1285,12 +1291,18 @@ public class MainActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setBackgroundColor(bg);
+        row.setMinimumHeight(dp(54));
+        pad(row, 0, 8, 0, 8);
         return row;
     }
 
     private SeekBar doomSeekBar(TextView label) {
         SeekBar bar = new SeekBar(this);
         bar.setMax(22);
+        bar.setProgressTintList(ColorStateList.valueOf(fg));
+        bar.setThumbTintList(ColorStateList.valueOf(fg));
+        bar.setProgressBackgroundTintList(ColorStateList.valueOf(line));
+        bar.setSplitTrack(false);
         bar.setProgress(Math.max(0, Math.min(22, prefs.getInt("doom_screens", 18) - 8)));
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
