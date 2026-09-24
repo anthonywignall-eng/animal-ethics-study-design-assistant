@@ -101,6 +101,8 @@ public class MainActivity extends Activity {
     private LauncherAdapter launcherAdapter;
     private AlphabetRailView alphabetRail;
     private boolean alphabetRailTargetVisible = false;
+    private LinearLayout drawerShelf;
+    private boolean drawerShelfTargetVisible = false;
 
     private enum Screen { HOME, SETTINGS, ONBOARDING, PICKER, NOTIFICATION_REVIEW, INTRO }
 
@@ -308,12 +310,23 @@ public class MainActivity extends Activity {
         launcherRecycler.setAdapter(launcherAdapter);
         frame.addView(launcherRecycler, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        drawerShelf = buildDrawerShelf();
+        drawerShelfTargetVisible = false;
+        drawerShelf.setAlpha(0f);
+        drawerShelf.setVisibility(View.INVISIBLE);
+        FrameLayout.LayoutParams shelfParams = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(98),
+            Gravity.TOP
+        );
+        frame.addView(drawerShelf, shelfParams);
+
         alphabetRail = new AlphabetRailView(this);
         alphabetRailTargetVisible = false;
         alphabetRail.setAlpha(0f);
         alphabetRail.setVisibility(View.INVISIBLE);
         FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(52), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END);
-        rp.topMargin = dp(18);
+        rp.topMargin = dp(108);
         rp.bottomMargin = dp(18);
         frame.addView(alphabetRail, rp);
 
@@ -334,11 +347,18 @@ public class MainActivity extends Activity {
                 int journey = launcherAdapter.journeyPosition();
                 int hiddenStart = launcherAdapter.hiddenHeaderPosition();
 
+                boolean beforeDoom = journey < 0 || last < journey;
                 boolean showRail = launcherAdapter.query.isEmpty()
                     && first >= launcherAdapter.firstAppPosition()
-                    && (journey < 0 || last < journey);
+                    && beforeDoom;
+
+                View headerView = lm.findViewByPosition(1);
+                boolean headerReachedTop =
+                    first > 1 ||
+                    (first == 1 && headerView != null && headerView.getTop() <= 0);
 
                 setAlphabetRailVisible(showRail);
+                setDrawerShelfVisible(headerReachedTop && beforeDoom);
 
                 if (hiddenStart >= 0) {
                     if (!insideHidden && first >= hiddenStart) {
@@ -390,28 +410,68 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void setDrawerShelfVisible(boolean visible) {
+        if (drawerShelf == null || drawerShelfTargetVisible == visible) return;
+        drawerShelfTargetVisible = visible;
+        drawerShelf.animate().cancel();
+
+        if (visible) {
+            drawerShelf.setVisibility(View.VISIBLE);
+            drawerShelf.setAlpha(0f);
+            drawerShelf.animate().alpha(1f).setDuration(170).start();
+        } else {
+            drawerShelf.animate()
+                .alpha(0f)
+                .setDuration(180)
+                .withEndAction(() -> {
+                    if (!drawerShelfTargetVisible && drawerShelf != null) {
+                        drawerShelf.setVisibility(View.INVISIBLE);
+                    }
+                })
+                .start();
+        }
+    }
+
     private LinearLayout buildHomePanel() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(bg);
         root.setMinimumHeight(availableHeight());
-        pad(root, 28, 66, 28, 20);
+        pad(root, 28, 42, 28, 20);
 
-        boolean anyUtility = false;
+        LinearLayout utilityBlock = new LinearLayout(this);
+        utilityBlock.setOrientation(LinearLayout.VERTICAL);
+        utilityBlock.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        if (modeOnHome("clock_mode")) {
-            TextView time = heading(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 62);
-            TextView date = text(new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(new Date()), 15, muted);
-            root.addView(time);
-            root.addView(date);
-            anyUtility = true;
+        boolean hasClock = modeOnHome("clock_mode");
+        boolean hasBattery = modeOnHome("battery_mode");
+
+        if (hasClock) {
+            TextView time = heading(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 68);
+            time.setGravity(Gravity.CENTER);
+            time.setIncludeFontPadding(false);
+            utilityBlock.addView(time, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(78)));
+
+            TextView date = text(new SimpleDateFormat("EEEE · d MMMM", Locale.getDefault()).format(new Date()), 14, muted);
+            date.setGravity(Gravity.CENTER);
+            date.setLetterSpacing(0.035f);
+            utilityBlock.addView(date, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28)));
         }
 
-        if (modeOnHome("battery_mode")) {
-            TextView battery = text("Battery · " + batteryPercent() + "%", 14, muted);
-            pad(battery, 0, anyUtility ? 4 : 0, 0, 0);
-            root.addView(battery);
-            anyUtility = true;
+        if (hasBattery) {
+            TextView battery = text("BATTERY  " + batteryPercent() + "%", 12, muted);
+            battery.setGravity(Gravity.CENTER);
+            battery.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            battery.setLetterSpacing(0.12f);
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34));
+            bp.topMargin = dp(hasClock ? 5 : 0);
+            utilityBlock.addView(battery, bp);
+        }
+
+        if (hasClock || hasBattery) {
+            LinearLayout.LayoutParams up = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            up.topMargin = dp(46);
+            root.addView(utilityBlock, up);
         }
 
         View stretch = new View(this);
@@ -445,23 +505,60 @@ public class MainActivity extends Activity {
         return root;
     }
 
+    private LinearLayout buildDrawerShelf() {
+        LinearLayout shelf = new LinearLayout(this);
+        shelf.setOrientation(LinearLayout.VERTICAL);
+        shelf.setGravity(Gravity.CENTER_HORIZONTAL);
+        shelf.setBackgroundColor(bg);
+        pad(shelf, 24, 10, 58, 8);
+
+        LinearLayout info = new LinearLayout(this);
+        info.setGravity(Gravity.CENTER);
+
+        if (modeInDrawer("clock_mode")) {
+            TextView clock = heading(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 24);
+            clock.setGravity(Gravity.CENTER);
+            clock.setIncludeFontPadding(false);
+            info.addView(clock, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+        }
+
+        if (modeInDrawer("clock_mode") && modeInDrawer("battery_mode")) {
+            TextView dot = text("  ·  ", 14, muted);
+            dot.setGravity(Gravity.CENTER);
+            info.addView(dot, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+        }
+
+        if (modeInDrawer("battery_mode")) {
+            TextView battery = text("BATTERY  " + batteryPercent() + "%", 11, muted);
+            battery.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            battery.setLetterSpacing(0.10f);
+            battery.setGravity(Gravity.CENTER);
+            info.addView(battery, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+        }
+
+        shelf.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36)));
+
+        TextView settings = heading("HIDDEN Settings", 15);
+        settings.setGravity(Gravity.CENTER);
+        settings.setLetterSpacing(0.025f);
+        settings.setOnClickListener(v -> showSettings());
+        shelf.addView(settings, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+
+        return shelf;
+    }
+
     private LinearLayout buildDrawerHeader() {
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.VERTICAL);
         top.setBackgroundColor(bg);
-        pad(top, 26, 42, 58, 14);
+        pad(top, 0, 0, 0, 14);
 
-        TextView settings = heading("HIDDEN Settings", 19);
-        pad(settings, 0, 5, 0, 10);
-        settings.setOnClickListener(v -> showSettings());
-        top.addView(settings);
+        LinearLayout inFlowShelf = buildDrawerShelf();
+        top.addView(inFlowShelf, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(98)));
 
-        String drawerInfo = drawerUtilityText();
-        if (!drawerInfo.isEmpty()) {
-            TextView utils = text(drawerInfo, 14, muted);
-            pad(utils, 0, 2, 0, 10);
-            top.addView(utils);
-        }
+        LinearLayout searchWrap = new LinearLayout(this);
+        searchWrap.setOrientation(LinearLayout.VERTICAL);
+        pad(searchWrap, 26, 8, 58, 0);
 
         EditText search = new EditText(this);
         search.setHint("Search apps");
@@ -473,7 +570,8 @@ public class MainActivity extends Activity {
         pad(search, 14, 9, 14, 9);
         search.setText(launcherAdapter == null ? "" : launcherAdapter.query);
         search.setSelection(search.length());
-        top.addView(search, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+        searchWrap.addView(search, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+        top.addView(searchWrap);
 
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -616,7 +714,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.4", 12, muted);
+        TextView version = text("HIDDEN · v0.4.1", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -1578,9 +1676,9 @@ public class MainActivity extends Activity {
             drawWorldRect(c, screen, 0f, sh, scrollY, bg);
 
             float rise = dp(40) * (1f - reveal);
-            drawWorldText(c, screen, "4:38", x + dp(20), dp(58) + rise, scrollY, dp(24), fg, true);
-            drawWorldText(c, screen, "Thursday, 24 September", x + dp(20), dp(78) + rise, scrollY, dp(10), muted, false);
-            drawWorldText(c, screen, "Battery · 72%", x + dp(20), dp(102) + rise, scrollY, dp(10), muted, false);
+            drawWorldCenteredText(c, screen, "4:38", dp(66) + rise, scrollY, dp(25), fg, true);
+            drawWorldCenteredText(c, screen, "Thursday · 24 September", dp(88) + rise, scrollY, dp(9), muted, false);
+            drawWorldCenteredText(c, screen, "BATTERY  72%", dp(112) + rise, scrollY, dp(9), muted, true);
             drawWorldText(c, screen, "Phone", x + dp(20), sh - dp(84) + rise, scrollY, dp(12), fg, false);
             drawWorldText(c, screen, "Messages", x + dp(20), sh - dp(60) + rise, scrollY, dp(12), fg, false);
             drawWorldText(c, screen, "Camera", x + dp(20), sh - dp(36) + rise, scrollY, dp(12), fg, false);
@@ -1588,10 +1686,11 @@ public class MainActivity extends Activity {
             // App drawer.
             float drawerTop = sh;
             drawWorldRect(c, screen, drawerTop, drawerTop + sh * 1.25f, scrollY, bg);
-            drawWorldText(c, screen, "HIDDEN Settings", x + dp(20), drawerTop + dp(46), scrollY, dp(13), fg, true);
-            String[] appNames = {"Calculator", "Camera", "Maps", "Messages", "Music", "Photos", "Weather"};
+            drawWorldCenteredText(c, screen, "4:38  ·  BATTERY 72%", drawerTop + dp(34), scrollY, dp(10), muted, true);
+            drawWorldCenteredText(c, screen, "HIDDEN Settings", drawerTop + dp(58), scrollY, dp(11), fg, true);
+            String[] appNames = {"Calculator", "Camera", "Maps", "Messages", "Music", "Photos"};
             for (int i = 0; i < appNames.length; i++) {
-                drawWorldText(c, screen, appNames[i], x + dp(20), drawerTop + dp(86 + i * 34), scrollY, dp(12), fg, false);
+                drawWorldText(c, screen, appNames[i], x + dp(20), drawerTop + dp(96 + i * 34), scrollY, dp(12), fg, false);
             }
 
             // A little dead air before the colour journey.
@@ -1651,6 +1750,28 @@ public class MainActivity extends Activity {
             drawWorldText(c, screen, "Instagram", x + dp(20), sh * 6.18f, scrollY, dp(12), Color.rgb(225,225,220), false);
             drawWorldText(c, screen, "Reddit", x + dp(20), sh * 6.25f, scrollY, dp(12), Color.rgb(225,225,220), false);
             drawWorldText(c, screen, "YouTube", x + dp(20), sh * 6.32f, scrollY, dp(12), Color.rgb(225,225,220), false);
+        }
+
+        private void drawWorldCenteredText(
+            Canvas c,
+            RectF screen,
+            String value,
+            float worldY,
+            float scrollY,
+            float textSize,
+            int color,
+            boolean bold
+        ) {
+            float y = screen.top + worldY - scrollY;
+            if (y < screen.top - dp(30) || y > screen.bottom + dp(30)) return;
+
+            p.setShader(null);
+            p.setColor(color);
+            p.setTypeface(Typeface.create("sans-serif", bold ? Typeface.BOLD : Typeface.NORMAL));
+            p.setTextSize(textSize);
+            p.setTextAlign(Paint.Align.CENTER);
+            c.drawText(value, screen.centerX(), y, p);
+            p.setTextAlign(Paint.Align.LEFT);
         }
 
         private void drawWorldRect(Canvas c, RectF screen, float worldTop, float worldBottom, float scrollY, int color) {
