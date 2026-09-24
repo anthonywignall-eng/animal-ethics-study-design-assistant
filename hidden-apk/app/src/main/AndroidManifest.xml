@@ -9,6 +9,8 @@
     </queries>
 
     <application
+        android:icon="@drawable/ic_hidden_icon"
+        android:roundIcon="@drawable/ic_hidden_icon"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:label="HIDDEN"
