@@ -1351,26 +1351,29 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {}
     }
 
-    private String themeLabel() {
-        String t = prefs.getString("theme_mode", "system");
+    private String themeLabel(String theme) {
+        String t = normaliseTheme(theme);
         if ("light".equals(t)) return "LIGHT";
         if ("dark".equals(t)) return "DARK";
         if ("oled".equals(t)) return "OLED";
-        if ("grayscale".equals(t)) return "GREYSCALE";
+        if ("doom_light".equals(t)) return "DOOM SCROLL LIGHT";
+        if ("doom_dark".equals(t)) return "DOOM SCROLL DARK";
         if ("8bit".equals(t)) return "8-BIT";
-        if ("doom".equals(t)) return "DOOM SCROLL";
-        return "SYSTEM";
+        return "DARK";
     }
 
-    private String nextTheme() {
-        String t = prefs.getString("theme_mode", "system");
-        if ("system".equals(t)) return "light";
+    private String themeLabelFor(String key) {
+        return themeLabel(themeFor(key));
+    }
+
+    private String nextThemeValue(String raw) {
+        String t = normaliseTheme(raw);
         if ("light".equals(t)) return "dark";
         if ("dark".equals(t)) return "oled";
-        if ("oled".equals(t)) return "grayscale";
-        if ("grayscale".equals(t)) return "8bit";
-        if ("8bit".equals(t)) return "doom";
-        return "system";
+        if ("oled".equals(t)) return "doom_light";
+        if ("doom_light".equals(t)) return "doom_dark";
+        if ("doom_dark".equals(t)) return "8bit";
+        return "light";
     }
 
     private void openHiddenWallpaperPicker() {
@@ -1386,24 +1389,6 @@ public class MainActivity extends Activity {
                 startActivity(new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER));
             } catch (Exception ignored) {}
         }
-    }
-
-    private String hiddenThemeLabel() {
-        String t = prefs.getString("hidden_theme", "dark");
-        if ("light".equals(t)) return "LIGHT";
-        if ("grayscale".equals(t)) return "GREYSCALE";
-        if ("8bit".equals(t)) return "8-BIT RETRO";
-        if ("doom".equals(t)) return "DOOM SCROLL";
-        return "DARK";
-    }
-
-    private String nextHiddenTheme() {
-        String t = prefs.getString("hidden_theme", "dark");
-        if ("dark".equals(t)) return "light";
-        if ("light".equals(t)) return "grayscale";
-        if ("grayscale".equals(t)) return "8bit";
-        if ("8bit".equals(t)) return "doom";
-        return "dark";
     }
 
     private int selectedCount(Set<String> set) {
