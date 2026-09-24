@@ -21,6 +21,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -178,7 +179,6 @@ public class MainActivity extends Activity {
     private void ensureDefaults() {
         SharedPreferences.Editor e = prefs.edit();
         if (!prefs.contains("clock_mode")) e.putString("clock_mode", MODE_HOME);
-        if (!prefs.contains("weather_mode")) e.putString("weather_mode", MODE_OFF);
         if (!prefs.contains("battery_mode")) e.putString("battery_mode", MODE_HOME);
         if (!prefs.contains("show_swipe_hint")) e.putBoolean("show_swipe_hint", true);
         if (!prefs.contains("theme_mode")) e.putString("theme_mode", "system");
@@ -214,6 +214,8 @@ public class MainActivity extends Activity {
         }
         getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
+        getWindow().setBackgroundDrawable(new ColorDrawable(bg));
+        getWindow().getDecorView().setBackgroundColor(bg);
     }
 
     private int dp(int value) {
@@ -405,14 +407,6 @@ public class MainActivity extends Activity {
             anyUtility = true;
         }
 
-        if (modeOnHome("weather_mode")) {
-            TextView weather = text("", 14, fg);
-            pad(weather, 0, anyUtility ? 18 : 0, 0, 0);
-            root.addView(weather);
-            renderWeather(weather);
-            anyUtility = true;
-        }
-
         if (modeOnHome("battery_mode")) {
             TextView battery = text("Battery · " + batteryPercent() + "%", 14, muted);
             pad(battery, 0, anyUtility ? 4 : 0, 0, 0);
@@ -467,7 +461,6 @@ public class MainActivity extends Activity {
             TextView utils = text(drawerInfo, 14, muted);
             pad(utils, 0, 2, 0, 10);
             top.addView(utils);
-            if (modeInDrawer("weather_mode")) renderDrawerWeather(utils);
         }
 
         EditText search = new EditText(this);
@@ -498,14 +491,6 @@ public class MainActivity extends Activity {
         List<String> bits = new ArrayList<>();
         if (modeInDrawer("clock_mode")) bits.add(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()));
         if (modeInDrawer("battery_mode")) bits.add("Battery " + batteryPercent() + "%");
-        if (modeInDrawer("weather_mode")) {
-            String cached = cachedWeather();
-            if (!cached.isEmpty()) bits.add(cached);
-            else {
-                String place = prefs.getString("weather_place_label", "").trim();
-                bits.add(place.isEmpty() ? "Weather · choose place" : place + " · checking");
-            }
-        }
         return join(bits, "   ·   ");
     }
 
@@ -592,7 +577,6 @@ public class MainActivity extends Activity {
 
         addSectionTitle(content, "UTILITIES");
         content.addView(modeRow("Clock", "clock_mode"));
-        content.addView(modeRow("Weather", "weather_mode"));
         content.addView(modeRow("Battery", "battery_mode"));
 
         addSectionTitle(content, "HOME");
@@ -603,49 +587,14 @@ public class MainActivity extends Activity {
         content.addView(actionRow("HIDDEN apps", selectedCount(hiddenSet()) + " hidden", v -> showAppPicker(false)));
         content.addView(cycleRow("HIDDEN-area theme", hiddenThemeLabel(), v -> {
             prefs.edit().putString("hidden_theme", nextHiddenTheme()).apply();
-            showSettings(scroll.getScrollY());
+            if (v instanceof LinearLayout) {
+                LinearLayout row = (LinearLayout)v;
+                if (row.getChildCount() > 1 && row.getChildAt(1) instanceof TextView) {
+                    ((TextView)row.getChildAt(1)).setText(hiddenThemeLabel());
+                }
+            }
         }));
         content.addView(actionRow("Review notifications", "Android settings", v -> showNotificationReview()));
-
-        addSectionTitle(content, "WEATHER");
-        TextView note = text("HIDDEN uses only the place you type here. It never asks Android for your location.", 14, muted);
-        note.setLineSpacing(0, 1.2f);
-        pad(note, 0, 0, 0, 10);
-        content.addView(note);
-
-        EditText city = new EditText(this);
-        city.setSingleLine(true);
-        city.setHint("Search for a place · Adelaide");
-        String selectedPlace = prefs.getString("weather_place_label", "");
-        city.setText(selectedPlace.isEmpty() ? prefs.getString("weather_city", "") : selectedPlace);
-        city.setTextColor(fg);
-        city.setHintTextColor(muted);
-        city.setTextSize(16);
-        city.setBackgroundColor(panel);
-        pad(city, 12, 8, 12, 8);
-        content.addView(city, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
-        city.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) revealAboveKeyboard(city);
-        });
-
-        TextView weatherResult = text(
-            selectedPlace.isEmpty() ? "No real place selected yet." : "Selected · " + selectedPlace,
-            13,
-            muted
-        );
-        pad(weatherResult, 0, 8, 0, 2);
-        content.addView(weatherResult);
-
-        TextView choosePlace = boldAction("Find and choose place");
-        choosePlace.setOnClickListener(v -> {
-            String query = city.getText().toString().trim();
-            if (query.isEmpty()) {
-                weatherResult.setText("Type a city or town first.");
-                return;
-            }
-            chooseWeatherPlace(query, city, weatherResult);
-        });
-        content.addView(choosePlace);
 
         addSectionTitle(content, "APPEARANCE");
         content.addView(cycleRow("Theme", themeLabel(), v -> {
@@ -660,14 +609,14 @@ public class MainActivity extends Activity {
         privacy.setLineSpacing(0, 1.25f);
         content.addView(privacy);
 
-        TextView internet = text("Internet is used only when Weather is enabled.", 13, muted);
-        pad(internet, 0, 8, 0, 14);
-        content.addView(internet);
+        TextView offline = text("HIDDEN has no internet permission. It cannot connect to the network.", 13, muted);
+        pad(offline, 0, 8, 0, 14);
+        content.addView(offline);
 
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.3.3", 12, muted);
+        TextView version = text("HIDDEN · v0.4", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -892,53 +841,13 @@ public class MainActivity extends Activity {
         pad(title, 0, 14, 0, 8);
         content.addView(title);
 
-        TextView copy = text("Put each utility on Home, in the app drawer, in both places, or nowhere. Your phone can be almost empty if you want.", 16, muted);
+        TextView copy = text("Put each utility on Home, in the app drawer, in both places, or nowhere. Or choose neither and leave your phone almost empty.", 16, muted);
         copy.setLineSpacing(0, 1.25f);
         content.addView(copy);
 
         addSectionTitle(content, "UTILITIES");
         content.addView(onboardingModeRow("Clock", "clock_mode"));
-        content.addView(onboardingModeRow("Weather", "weather_mode"));
         content.addView(onboardingModeRow("Battery", "battery_mode"));
-
-        if (!MODE_OFF.equals(prefs.getString("weather_mode", MODE_OFF))) {
-            EditText city = new EditText(this);
-            city.setSingleLine(true);
-            city.setHint("Search for a place · Adelaide");
-            String selectedPlace = prefs.getString("weather_place_label", "");
-            city.setText(selectedPlace.isEmpty() ? prefs.getString("weather_city", "") : selectedPlace);
-            city.setTextColor(fg);
-            city.setHintTextColor(muted);
-            city.setTextSize(16);
-            city.setBackgroundColor(panel);
-            pad(city, 12, 8, 12, 8);
-            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50));
-            cp.topMargin = dp(14);
-            content.addView(city, cp);
-            city.setOnFocusChangeListener((v, hasFocus) -> {
-                if (hasFocus) revealAboveKeyboard(city);
-            });
-
-            TextView selected = text(
-                selectedPlace.isEmpty() ? "No real place selected yet." : "Selected · " + selectedPlace,
-                13,
-                muted
-            );
-            pad(selected, 0, 7, 0, 0);
-            content.addView(selected);
-
-            TextView choose = boldAction("Find and choose place");
-            choose.setOnClickListener(v -> {
-                String query = city.getText().toString().trim();
-                if (query.isEmpty()) {
-                    selected.setText("Type a city or town first.");
-                    return;
-                }
-                chooseWeatherPlace(query, city, selected);
-            });
-            content.addView(choose);
-        }
-    }
 
     private View onboardingModeRow(String label, String key) {
         LinearLayout block = new LinearLayout(this);
@@ -1054,10 +963,10 @@ public class MainActivity extends Activity {
         privacy.setLineSpacing(0, 1.25f);
         content.addView(privacy);
 
-        TextView weather = text("Weather is optional. If enabled, HIDDEN sends only the place name you typed to the weather provider.", 13, muted);
-        weather.setLineSpacing(0, 1.25f);
-        pad(weather, 0, 10, 0, 18);
-        content.addView(weather);
+        TextView offline = text("HIDDEN has no internet permission. Nothing leaves your phone.", 13, muted);
+        offline.setLineSpacing(0, 1.25f);
+        pad(offline, 0, 10, 0, 18);
+        content.addView(offline);
 
         TextView homeStatus = boldAction(isDefaultHome() ? "HIDDEN is already your Home app" : "Choose HIDDEN as your Home app");
         homeStatus.setOnClickListener(v -> requestHomeRole());
@@ -1450,7 +1359,7 @@ public class MainActivity extends Activity {
         c.setConnectTimeout(7000);
         c.setReadTimeout(7000);
         c.setRequestProperty("Accept", "application/json");
-        c.setRequestProperty("User-Agent", "HiddenLauncher/0.3.3");
+        c.setRequestProperty("User-Agent", "HiddenLauncher/0.4");
 
         try {
             int code = c.getResponseCode();
