@@ -10,8 +10,8 @@ android {
         applicationId = "com.hidden.launcher"
         minSdk = 29
         targetSdk = 37
-        versionCode = 13
-        versionName = "0.6.1"
+        versionCode = 14
+        versionName = "0.6.2"
     }
 
     compileOptions {
