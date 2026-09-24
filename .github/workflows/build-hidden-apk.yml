@@ -1,9 +1,9 @@
-name: Build HIDDEN v0.6 APK
+name: Build HIDDEN v0.6.1 APK
 
 on:
   push:
     branches:
-      - hidden-v0.6-build
+      - hidden-v0.6.1-build
 
 jobs:
   build:
@@ -33,5 +33,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: hidden-v0.6-debug-apk
+          name: hidden-v0.6.1-debug-apk
           path: hidden-apk/app/build/outputs/apk/debug/app-debug.apk
