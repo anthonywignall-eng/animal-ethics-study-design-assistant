@@ -1,9 +1,7 @@
 package com.hidden.launcher;
 
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.service.wallpaper.WallpaperService;
 import android.view.SurfaceHolder;
 
@@ -35,7 +33,7 @@ public class HiddenWallpaperService extends WallpaperService {
 
         @Override
         public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-            if ("theme_mode".equals(key)) draw();
+            if ("home_theme".equals(key) || "theme_mode".equals(key)) draw();
         }
 
         @Override
@@ -50,27 +48,20 @@ public class HiddenWallpaperService extends WallpaperService {
             try {
                 canvas = holder.lockCanvas();
                 if (canvas == null) return;
-                canvas.drawColor(backgroundForTheme());
+
+                String fallback = prefs.getString("theme_mode", "dark");
+                String theme = prefs.getString("home_theme", fallback);
+                ThemeArt.draw(
+                    canvas,
+                    canvas.getWidth(),
+                    canvas.getHeight(),
+                    theme,
+                    getResources(),
+                    4815162342L
+                );
             } finally {
                 if (canvas != null) holder.unlockCanvasAndPost(canvas);
             }
-        }
-
-        private int backgroundForTheme() {
-            String mode = prefs.getString("theme_mode", "system");
-
-            if ("oled".equals(mode)) return Color.BLACK;
-            if ("dark".equals(mode)) return Color.rgb(18, 18, 18);
-            if ("light".equals(mode)) return Color.rgb(241, 239, 232);
-            if ("grayscale".equals(mode)) return Color.rgb(24, 24, 24);
-            if ("8bit".equals(mode)) return Color.rgb(10, 14, 28);
-            if ("doom".equals(mode)) return Color.rgb(13, 10, 9);
-
-            int night = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-            if (night == Configuration.UI_MODE_NIGHT_YES) {
-                return Color.rgb(18, 18, 18);
-            }
-            return Color.rgb(241, 239, 232);
         }
     }
 }
