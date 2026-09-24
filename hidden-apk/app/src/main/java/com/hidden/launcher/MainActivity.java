@@ -322,7 +322,7 @@ public class MainActivity extends Activity {
             t.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
             t.setLetterSpacing(0.055f);
         } else {
-            applyStrongTypeface(t);
+            t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         }
     }
 
@@ -890,7 +890,8 @@ public class MainActivity extends Activity {
     }
 
     private void addSectionTitle(LinearLayout parent, String title) {
-        TextView t = text(title, 12, muted);
+        String display = isTheme("8bit") ? "[ " + title + " ]" : title;
+        TextView t = text(display, 12, muted);
         applyStrongTypeface(t);
         pad(t, 0, 30, 0, 8);
         parent.addView(t);
@@ -1378,7 +1379,7 @@ public class MainActivity extends Activity {
         String t = prefs.getString("hidden_theme", "dark");
         if ("light".equals(t)) return "LIGHT";
         if ("grayscale".equals(t)) return "GREYSCALE";
-        if ("8bit".equals(t)) return "8-BIT MESS";
+        if ("8bit".equals(t)) return "8-BIT RETRO";
         if ("doom".equals(t)) return "DOOM SCROLL";
         return "DARK";
     }
@@ -2332,6 +2333,12 @@ public class MainActivity extends Activity {
                     TextView fine = text("fine.", 13, hp.muted);
                     pad(fine, 0, 2, 0, 8);
                     block.addView(fine);
+                } else if ("8bit".equals(prefs.getString("hidden_theme", "dark"))) {
+                    TextView ready = text("SECTOR 00 // READY_", 12, hp.muted);
+                    ready.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+                    ready.getPaint().setAntiAlias(false);
+                    pad(ready, 0, 2, 0, 8);
+                    block.addView(ready);
                 }
 
                 if (showRepeatPause && !doomPaused()) {
@@ -2410,8 +2417,10 @@ public class MainActivity extends Activity {
 
             String theme = prefs.getString("hidden_theme", "dark");
             if ("8bit".equals(theme)) {
-                h.label.setTypeface(Typeface.MONOSPACE);
-                h.label.setText(glitchLabel(app.label));
+                h.label.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+                h.label.getPaint().setAntiAlias(false);
+                h.label.setLetterSpacing(0.055f);
+                h.label.setText("> " + app.label.toUpperCase(Locale.ROOT) + " _");
             } else if ("doom".equals(theme)) {
                 h.label.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
                 h.label.setText(earthyDoomText(app.label.toUpperCase(Locale.ROOT)));
@@ -2482,7 +2491,7 @@ public class MainActivity extends Activity {
         String theme = prefs.getString("hidden_theme", "dark");
         if ("light".equals(theme)) return new HiddenPalette(Color.rgb(242, 240, 234), Color.rgb(22, 22, 20), Color.rgb(112, 112, 106));
         if ("grayscale".equals(theme)) return new HiddenPalette(Color.rgb(184, 184, 184), Color.rgb(35, 35, 35), Color.rgb(86, 86, 86));
-        if ("8bit".equals(theme)) return new HiddenPalette(Color.rgb(12, 12, 15), Color.rgb(235, 235, 231), Color.rgb(128, 128, 132));
+        if ("8bit".equals(theme)) return new HiddenPalette(Color.rgb(10, 14, 28), Color.rgb(244, 232, 180), Color.rgb(154, 166, 124));
         if ("doom".equals(theme)) return new HiddenPalette(Color.rgb(10, 8, 8), Color.rgb(218, 176, 159), Color.rgb(143, 115, 105));
         return new HiddenPalette(Color.rgb(8, 9, 12), Color.rgb(241, 241, 238), Color.rgb(136, 138, 145));
     }
