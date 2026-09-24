@@ -119,8 +119,8 @@ public final class ThemeArt {
                 Color.rgb(63, 58, 48)
             };
 
-        int bigCount = dark ? 58 : 74;
-        int tinyCount = dark ? 115 : 170;
+        int bigCount = dark ? 34 : 74;
+        int tinyCount = dark ? 68 : 170;
 
         for (int i = 0; i < bigCount; i++) {
             float x = random.nextFloat() * width;
