@@ -193,9 +193,14 @@ public class MainActivity extends Activity {
         e.apply();
     }
 
+    private boolean isTheme(String name) {
+        return name.equals(prefs.getString("theme_mode", "system"));
+    }
+
     private boolean useDarkPalette() {
         String mode = prefs.getString("theme_mode", "system");
-        if ("dark".equals(mode) || "oled".equals(mode)) return true;
+        if ("dark".equals(mode) || "oled".equals(mode) || "grayscale".equals(mode) ||
+            "8bit".equals(mode) || "doom".equals(mode)) return true;
         if ("light".equals(mode)) return false;
         int night = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
         return night == Configuration.UI_MODE_NIGHT_YES;
@@ -203,15 +208,35 @@ public class MainActivity extends Activity {
 
     private void applyPalette() {
         String mode = prefs.getString("theme_mode", "system");
-        boolean oled = "oled".equals(mode);
         boolean dark = useDarkPalette();
 
-        if (oled) {
+        if ("oled".equals(mode)) {
             bg = Color.BLACK;
             fg = Color.rgb(248, 248, 245);
             muted = Color.rgb(158, 158, 153);
             panel = Color.rgb(13, 13, 13);
             line = Color.rgb(38, 38, 38);
+            getWindow().getDecorView().setSystemUiVisibility(0);
+        } else if ("grayscale".equals(mode)) {
+            bg = Color.rgb(24, 24, 24);
+            fg = Color.rgb(228, 228, 224);
+            muted = Color.rgb(142, 142, 138);
+            panel = Color.rgb(38, 38, 38);
+            line = Color.rgb(70, 70, 70);
+            getWindow().getDecorView().setSystemUiVisibility(0);
+        } else if ("8bit".equals(mode)) {
+            bg = Color.rgb(10, 14, 28);
+            fg = Color.rgb(244, 232, 180);
+            muted = Color.rgb(154, 166, 124);
+            panel = Color.rgb(20, 27, 45);
+            line = Color.rgb(83, 96, 67);
+            getWindow().getDecorView().setSystemUiVisibility(0);
+        } else if ("doom".equals(mode)) {
+            bg = Color.rgb(13, 10, 9);
+            fg = Color.rgb(220, 178, 159);
+            muted = Color.rgb(151, 164, 140);
+            panel = Color.rgb(27, 21, 19);
+            line = Color.rgb(91, 67, 59);
             getWindow().getDecorView().setSystemUiVisibility(0);
         } else if (dark) {
             bg = Color.rgb(18, 18, 18);
@@ -250,20 +275,71 @@ public class MainActivity extends Activity {
         return id > 0 ? getResources().getDimensionPixelSize(id) : 0;
     }
 
+    private CharSequence globalStyledText(String value) {
+        if (!isTheme("doom")) return value;
+
+        int[] colors = {
+            Color.rgb(205, 146, 129),
+            Color.rgb(168, 174, 137),
+            Color.rgb(202, 171, 112),
+            Color.rgb(143, 139, 154),
+            Color.rgb(190, 154, 146),
+            Color.rgb(151, 168, 157)
+        };
+
+        SpannableString styled = new SpannableString(value);
+        for (int i = 0; i < value.length(); i++) {
+            if (Character.isWhitespace(value.charAt(i))) continue;
+            styled.setSpan(
+                new ForegroundColorSpan(colors[i % colors.length]),
+                i,
+                i + 1,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            );
+        }
+        return styled;
+    }
+
+    private void applyRegularTypeface(TextView t) {
+        if (isTheme("8bit")) {
+            t.setTypeface(Typeface.MONOSPACE, Typeface.NORMAL);
+            t.setLetterSpacing(0.045f);
+            t.getPaint().setAntiAlias(false);
+        } else if (isTheme("doom")) {
+            t.setTypeface(Typeface.create("sans-serif-condensed", Typeface.NORMAL));
+            t.setLetterSpacing(0.035f);
+        } else {
+            t.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        }
+    }
+
+    private void applyStrongTypeface(TextView t) {
+        if (isTheme("8bit")) {
+            t.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            t.setLetterSpacing(0.055f);
+            t.getPaint().setAntiAlias(false);
+        } else if (isTheme("doom")) {
+            t.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+            t.setLetterSpacing(0.055f);
+        } else {
+            applyStrongTypeface(t);
+        }
+    }
+
     private TextView text(String value, float sp, int color) {
         TextView t = new TextView(this);
-        t.setText(value);
+        t.setText(globalStyledText(value));
         t.setTextSize(sp);
-        t.setTextColor(color);
+        t.setTextColor(isTheme("doom") ? fg : color);
         t.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         t.setFontFeatureSettings("kern");
-        t.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        applyRegularTypeface(t);
         return t;
     }
 
     private TextView heading(String value, float sp) {
         TextView t = text(value, sp, fg);
-        t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        applyStrongTypeface(t);
         return t;
     }
 
@@ -477,7 +553,7 @@ public class MainActivity extends Activity {
         if (hasBattery) {
             TextView battery = text("BATTERY  " + batteryPercent() + "%", 12, muted);
             battery.setGravity(Gravity.CENTER);
-            battery.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            applyStrongTypeface(battery);
             battery.setLetterSpacing(0.12f);
             LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34));
             bp.topMargin = dp(hasClock ? 5 : 0);
@@ -501,7 +577,7 @@ public class MainActivity extends Activity {
         for (AppItem app : apps) {
             if (essential.contains(app.pkg) && !hidden.contains(app.pkg)) {
                 TextView row = text(app.label, 21, fg);
-                row.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+                applyStrongTypeface(row);
                 pad(row, 0, 5, 0, 5);
                 row.setOnClickListener(v -> launch(app));
                 favourites.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
@@ -550,7 +626,7 @@ public class MainActivity extends Activity {
 
         if (modeInDrawer("battery_mode")) {
             TextView battery = text("BATTERY  " + batteryPercent() + "%", 11, muted);
-            battery.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            applyStrongTypeface(battery);
             battery.setLetterSpacing(0.10f);
             battery.setGravity(Gravity.CENTER);
             info.addView(battery, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
@@ -559,12 +635,20 @@ public class MainActivity extends Activity {
         shelf.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34)));
 
         EditText search = new EditText(this);
-        search.setHint("Search apps");
+        search.setHint(isTheme("8bit") ? "SEARCH APPS_" : "Search apps");
         search.setSingleLine(true);
         search.setTextSize(15);
         search.setTextColor(fg);
         search.setHintTextColor(muted);
         search.setBackgroundColor(panel);
+        if (isTheme("8bit")) {
+            search.setTypeface(Typeface.MONOSPACE);
+            search.setAllCaps(false);
+            search.getPaint().setAntiAlias(false);
+        } else if (isTheme("doom")) {
+            search.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+            search.setLetterSpacing(0.04f);
+        }
         pad(search, 14, 8, 14, 8);
         search.setText(launcherAdapter == null ? "" : launcherAdapter.query);
         search.setSelection(search.length());
@@ -590,7 +674,7 @@ public class MainActivity extends Activity {
         });
 
         TextView settings = text("HIDDEN SETTINGS", 12, muted);
-        settings.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        applyStrongTypeface(settings);
         settings.setGravity(Gravity.CENTER);
         settings.setLetterSpacing(0.12f);
         settings.setOnClickListener(v -> showSettings());
@@ -773,7 +857,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.4.3", 12, muted);
+        TextView version = text("HIDDEN · v0.5", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -800,14 +884,14 @@ public class MainActivity extends Activity {
 
     private TextView boldAction(String label) {
         TextView t = text(label, 16, fg);
-        t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        applyStrongTypeface(t);
         pad(t, 0, 12, 0, 12);
         return t;
     }
 
     private void addSectionTitle(LinearLayout parent, String title) {
         TextView t = text(title, 12, muted);
-        t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        applyStrongTypeface(t);
         pad(t, 0, 30, 0, 8);
         parent.addView(t);
     }
@@ -923,7 +1007,7 @@ public class MainActivity extends Activity {
         welcome.setAlpha(0f);
 
         TextView brand = text("HIDDEN", 12, muted);
-        brand.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        applyStrongTypeface(brand);
         welcome.addView(brand);
 
         TextView title = heading("Welcome to HIDDEN Launcher", 36);
@@ -962,7 +1046,7 @@ public class MainActivity extends Activity {
         scroll.addView(outer);
 
         TextView brand = text("HIDDEN", 12, muted);
-        brand.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        applyStrongTypeface(brand);
         outer.addView(brand);
 
         if (page == 0) onboardingOne(outer);
@@ -1025,7 +1109,8 @@ public class MainActivity extends Activity {
         for (int i = 0; i < values.length; i++) {
             String value = values[i];
             TextView option = text(labels[i], 12, value.equals(current) ? fg : muted);
-            option.setTypeface(Typeface.create("sans-serif", value.equals(current) ? Typeface.BOLD : Typeface.NORMAL));
+            if (value.equals(current)) applyStrongTypeface(option);
+            else applyRegularTypeface(option);
             option.setGravity(Gravity.CENTER);
             option.setBackgroundColor(value.equals(current) ? panel : Color.TRANSPARENT);
             LinearLayout.LayoutParams op = new LinearLayout.LayoutParams(0, dp(42), 1f);
@@ -1257,6 +1342,9 @@ public class MainActivity extends Activity {
         if ("light".equals(t)) return "LIGHT";
         if ("dark".equals(t)) return "DARK";
         if ("oled".equals(t)) return "OLED";
+        if ("grayscale".equals(t)) return "GREYSCALE";
+        if ("8bit".equals(t)) return "8-BIT";
+        if ("doom".equals(t)) return "DOOM SCROLL";
         return "SYSTEM";
     }
 
@@ -1265,6 +1353,9 @@ public class MainActivity extends Activity {
         if ("system".equals(t)) return "light";
         if ("light".equals(t)) return "dark";
         if ("dark".equals(t)) return "oled";
+        if ("oled".equals(t)) return "grayscale";
+        if ("grayscale".equals(t)) return "8bit";
+        if ("8bit".equals(t)) return "doom";
         return "system";
     }
 
@@ -1915,7 +2006,7 @@ public class MainActivity extends Activity {
 
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            painapplyStrongTypeface(t);
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setTextSize(dp(10));
             paint.setColor(muted);
@@ -2202,9 +2293,18 @@ public class MainActivity extends Activity {
                 AppItem app = (AppItem)items.get(position);
                 AppHolder h = (AppHolder)holder;
                 h.root.setBackgroundColor(bg);
-                h.label.setText(app.label);
                 h.label.setTextColor(fg);
-                h.label.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+
+                if (isTheme("8bit")) {
+                    h.label.setText("> " + app.label.toUpperCase(Locale.ROOT));
+                    applyRegularTypeface(h.label);
+                } else if (isTheme("doom")) {
+                    h.label.setText(globalStyledText(app.label.toUpperCase(Locale.ROOT)));
+                    applyStrongTypeface(h.label);
+                } else {
+                    h.label.setText(app.label);
+                    applyRegularTypeface(h.label);
+                }
                 h.root.setOnClickListener(v -> launch(app));
                 h.root.setOnLongClickListener(v -> { confirmHide(app); return true; });
                 return;
@@ -2265,7 +2365,7 @@ public class MainActivity extends Activity {
 
         private TextView hiddenHeading(String value, float sp, int color) {
             TextView t = text(value, sp, color);
-            t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            applyStrongTypeface(t);
             return t;
         }
 
