@@ -250,12 +250,12 @@ public class MainActivity extends Activity {
     private boolean pruneSelectionSets() {
         if (prefs == null) return false;
 
-        Set<String> installed = new HashSet<>();
-        for (AppItem app : apps) installed.add(app.pkg);
-
         Set<String> hidden = hiddenSet();
         Set<String> essential = essentialSet();
-        boolean changed = hidden.retainAll(installed) | essential.retainAll(installed);
+
+        boolean hiddenChanged = hidden.removeIf(pkg -> !isPackageInstalled(pkg));
+        boolean essentialChanged = essential.removeIf(pkg -> !isPackageInstalled(pkg));
+        boolean changed = hiddenChanged || essentialChanged;
 
         if (changed) {
             SharedPreferences.Editor e = prefs.edit();
@@ -264,6 +264,15 @@ public class MainActivity extends Activity {
             e.apply();
         }
         return changed;
+    }
+
+    private boolean isPackageInstalled(String pkg) {
+        try {
+            getPackageManager().getApplicationInfo(pkg, 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
     }
 
     private void refreshExternalStateViews() {
