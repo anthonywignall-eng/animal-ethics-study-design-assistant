@@ -2307,25 +2307,42 @@ public class MainActivity extends Activity {
     class JourneyView extends View {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Random random = new Random(4815162342L);
-        private final List<float[]> stars = new ArrayList<>();
+        private final List<float[]> decorations = new ArrayList<>();
+        private final String journeyTheme;
 
         JourneyView(Context context, int height) {
             super(context);
+            journeyTheme = currentTheme();
             setMinimumHeight(height);
-            buildStars(height);
+            buildDecorations(height);
         }
 
-        private void buildStars(int height) {
-            int starStart = (int)(height * 0.78f);
-            int count = Math.max(80, (height - starStart) / Math.max(1, getResources().getDisplayMetrics().heightPixels) * 42);
+        private void buildDecorations(int height) {
+            int decorStart = (int)(height * 0.78f);
+            int screen = Math.max(1, getResources().getDisplayMetrics().heightPixels);
+            int zoneScreens = Math.max(1, (height - decorStart) / screen);
             int width = getResources().getDisplayMetrics().widthPixels;
+
+            boolean flowers = "soft_launch".equals(journeyTheme);
+            boolean moths = "moth".equals(journeyTheme);
+            int count = flowers ? Math.max(24, zoneScreens * 12)
+                : moths ? Math.max(20, zoneScreens * 10)
+                : Math.max(80, zoneScreens * 42);
 
             for (int i = 0; i < count; i++) {
                 float x = random.nextFloat() * width;
-                float y = starStart + random.nextFloat() * Math.max(1, height - starStart);
-                float r = dp(1) + random.nextFloat() * dp(1.4f);
-                float a = 0.35f + random.nextFloat() * 0.65f;
-                stars.add(new float[]{x, y, r, a});
+                float y = decorStart + random.nextFloat() * Math.max(1, height - decorStart);
+                float alpha = flowers || moths
+                    ? 0.70f + random.nextFloat() * 0.30f
+                    : 0.35f + random.nextFloat() * 0.65f;
+                float size = flowers
+                    ? dp(7f + random.nextFloat() * 7f)
+                    : moths
+                        ? dp(8f + random.nextFloat() * 8f)
+                        : dp(1f + random.nextFloat() * 1.4f);
+                float rotation = -35f + random.nextFloat() * 70f;
+                float type = random.nextInt(flowers ? 5 : moths ? 4 : 1);
+                decorations.add(new float[]{x, y, size, alpha, rotation, type});
             }
         }
 
@@ -2346,27 +2363,228 @@ public class MainActivity extends Activity {
             p.setShader(null);
             canvas.save();
             canvas.clipRect(0, 0, getWidth(), blank);
-            ThemeArt.draw(canvas, getWidth(), blank, currentTheme(), getResources(), 4815162342L);
+            ThemeArt.draw(canvas, getWidth(), blank, journeyTheme, getResources(), 4815162342L);
             canvas.restore();
 
-            int[] colors = useDarkPalette()
-                ? new int[]{bg, Color.rgb(84, 69, 92), Color.rgb(132, 82, 92), Color.rgb(171, 104, 85), Color.rgb(113, 76, 99), Color.rgb(51, 50, 69), Color.rgb(7, 8, 11)}
-                : new int[]{bg, Color.rgb(224, 205, 159), Color.rgb(213, 164, 123), Color.rgb(190, 126, 112), Color.rgb(157, 111, 131), Color.rgb(101, 88, 113), Color.rgb(48, 49, 67), Color.rgb(7, 8, 11)};
+            int[] colors;
+            int endColor;
+            if ("soft_launch".equals(journeyTheme)) {
+                colors = new int[]{
+                    bg,
+                    Color.rgb(236, 215, 218),
+                    Color.rgb(216, 181, 191),
+                    Color.rgb(177, 139, 158),
+                    Color.rgb(116, 91, 116),
+                    Color.rgb(66, 55, 71),
+                    Color.rgb(24, 21, 29)
+                };
+                endColor = Color.rgb(24, 21, 29);
+            } else if ("moth".equals(journeyTheme)) {
+                colors = new int[]{
+                    bg,
+                    Color.rgb(44, 37, 48),
+                    Color.rgb(67, 51, 57),
+                    Color.rgb(91, 65, 58),
+                    Color.rgb(70, 62, 62),
+                    Color.rgb(38, 35, 42),
+                    Color.rgb(13, 13, 16)
+                };
+                endColor = Color.rgb(13, 13, 16);
+            } else {
+                colors = useDarkPalette()
+                    ? new int[]{bg, Color.rgb(84, 69, 92), Color.rgb(132, 82, 92), Color.rgb(171, 104, 85), Color.rgb(113, 76, 99), Color.rgb(51, 50, 69), Color.rgb(7, 8, 11)}
+                    : new int[]{bg, Color.rgb(224, 205, 159), Color.rgb(213, 164, 123), Color.rgb(190, 126, 112), Color.rgb(157, 111, 131), Color.rgb(101, 88, 113), Color.rgb(48, 49, 67), Color.rgb(7, 8, 11)};
+                endColor = Color.rgb(7, 8, 11);
+            }
 
             LinearGradient g = new LinearGradient(0, blank, 0, colorEnd, colors, null, Shader.TileMode.CLAMP);
             p.setShader(g);
             canvas.drawRect(0, blank, getWidth(), colorEnd, p);
             p.setShader(null);
 
-            p.setColor(Color.rgb(7, 8, 11));
+            p.setColor(endColor);
             canvas.drawRect(0, colorEnd, getWidth(), h, p);
 
             Rect clip = canvas.getClipBounds();
-            for (float[] s : stars) {
-                if (s[1] < clip.top - dp(4) || s[1] > clip.bottom + dp(4)) continue;
-                p.setColor(Color.argb((int)(255 * s[3]), 245, 245, 243));
-                canvas.drawCircle(s[0], s[1], s[2], p);
+            for (float[] d : decorations) {
+                if (d[1] < clip.top - dp(24) || d[1] > clip.bottom + dp(24)) continue;
+
+                if ("soft_launch".equals(journeyTheme)) {
+                    drawNativeFlower(canvas, d);
+                } else if ("moth".equals(journeyTheme)) {
+                    drawCeramicMoth(canvas, d);
+                } else {
+                    p.setStyle(Paint.Style.FILL);
+                    p.setShader(null);
+                    p.setColor(Color.argb((int)(255 * d[3]), 245, 245, 243));
+                    canvas.drawCircle(d[0], d[1], d[2], p);
+                }
             }
+        }
+
+        private void drawNativeFlower(Canvas canvas, float[] d) {
+            float x = d[0], y = d[1], s = d[2];
+            int alpha = (int)(255 * d[3]);
+            int type = (int)d[5];
+
+            canvas.save();
+            canvas.rotate(d[4], x, y);
+            p.setShader(null);
+            p.setStrokeCap(Paint.Cap.ROUND);
+
+            if (type == 0) { // wattle
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(1f, s * 0.10f));
+                p.setColor(Color.argb(alpha, 111, 129, 85));
+                canvas.drawLine(x - s * 0.55f, y + s * 0.55f, x + s * 0.35f, y - s * 0.45f, p);
+
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb(alpha, 222, 178, 65));
+                for (int i = 0; i < 6; i++) {
+                    float t = i / 5f;
+                    float cx = x - s * 0.32f + t * s * 0.68f;
+                    float cy = y + s * 0.28f - t * s * 0.70f;
+                    canvas.drawCircle(cx + (i % 2 == 0 ? -s * 0.14f : s * 0.14f), cy, s * 0.15f, p);
+                }
+            } else if (type == 1) { // gum blossom
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(1f, s * 0.075f));
+                p.setColor(Color.argb(alpha, 219, 137, 153));
+                for (int i = 0; i < 10; i++) {
+                    double a = (Math.PI * 2.0 * i) / 10.0;
+                    float ex = x + (float)Math.cos(a) * s * 0.72f;
+                    float ey = y + (float)Math.sin(a) * s * 0.72f;
+                    canvas.drawLine(x, y, ex, ey, p);
+                }
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb(alpha, 236, 188, 194));
+                canvas.drawCircle(x, y, s * 0.22f, p);
+                p.setColor(Color.argb(alpha, 116, 129, 87));
+                canvas.drawOval(new RectF(x - s * 0.36f, y + s * 0.20f, x + s * 0.36f, y + s * 0.52f), p);
+            } else if (type == 2) { // billy button
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(1f, s * 0.09f));
+                p.setColor(Color.argb(alpha, 101, 122, 79));
+                canvas.drawLine(x, y + s * 0.85f, x, y + s * 0.10f, p);
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb(alpha, 226, 181, 62));
+                canvas.drawCircle(x, y - s * 0.08f, s * 0.42f, p);
+                p.setColor(Color.argb(Math.max(80, alpha / 2), 255, 221, 121));
+                canvas.drawCircle(x - s * 0.12f, y - s * 0.20f, s * 0.10f, p);
+            } else if (type == 3) { // flannel flower
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb(alpha, 239, 231, 216));
+                for (int i = 0; i < 5; i++) {
+                    canvas.save();
+                    canvas.rotate(i * 72f, x, y);
+                    canvas.drawOval(new RectF(x - s * 0.20f, y - s * 0.78f, x + s * 0.20f, y - s * 0.06f), p);
+                    canvas.restore();
+                }
+                p.setColor(Color.argb(alpha, 126, 141, 103));
+                canvas.drawCircle(x, y, s * 0.22f, p);
+            } else { // waratah
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb(alpha, 187, 83, 91));
+                for (int i = 0; i < 8; i++) {
+                    double a = (Math.PI * 2.0 * i) / 8.0;
+                    float cx = x + (float)Math.cos(a) * s * 0.28f;
+                    float cy = y + (float)Math.sin(a) * s * 0.28f;
+                    canvas.drawOval(new RectF(cx - s * 0.22f, cy - s * 0.34f, cx + s * 0.22f, cy + s * 0.34f), p);
+                }
+                p.setColor(Color.argb(alpha, 221, 139, 135));
+                canvas.drawCircle(x, y, s * 0.28f, p);
+            }
+
+            canvas.restore();
+        }
+
+        private void drawCeramicMoth(Canvas canvas, float[] d) {
+            float x = d[0], y = d[1], s = d[2];
+            int alpha = (int)(255 * d[3]);
+            int type = (int)d[5];
+
+            int[] wingColors = {
+                Color.rgb(185, 136, 113),
+                Color.rgb(201, 170, 157),
+                Color.rgb(139, 151, 121),
+                Color.rgb(164, 143, 174)
+            };
+            int wing = wingColors[type % wingColors.length];
+            int outline = Color.rgb(232, 217, 194);
+            int body = Color.rgb(83, 68, 63);
+
+            canvas.save();
+            canvas.rotate(d[4], x, y);
+
+            Path left = new Path();
+            left.moveTo(x - s * 0.08f, y - s * 0.16f);
+            left.cubicTo(x - s * 0.35f, y - s * 0.80f, x - s * 1.05f, y - s * 0.72f, x - s * 0.92f, y - s * 0.08f);
+            left.cubicTo(x - s * 0.80f, y + s * 0.48f, x - s * 0.32f, y + s * 0.45f, x - s * 0.08f, y + s * 0.12f);
+            left.close();
+
+            Path right = new Path();
+            right.moveTo(x + s * 0.08f, y - s * 0.16f);
+            right.cubicTo(x + s * 0.35f, y - s * 0.80f, x + s * 1.05f, y - s * 0.72f, x + s * 0.92f, y - s * 0.08f);
+            right.cubicTo(x + s * 0.80f, y + s * 0.48f, x + s * 0.32f, y + s * 0.45f, x + s * 0.08f, y + s * 0.12f);
+            right.close();
+
+            // Fake raised ceramic shadow.
+            canvas.save();
+            canvas.translate(s * 0.10f, s * 0.14f);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.argb(Math.min(150, alpha / 2), 0, 0, 0));
+            canvas.drawPath(left, p);
+            canvas.drawPath(right, p);
+            canvas.restore();
+
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.argb(alpha, Color.red(wing), Color.green(wing), Color.blue(wing)));
+            canvas.drawPath(left, p);
+            canvas.drawPath(right, p);
+
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1f, s * 0.08f));
+            p.setColor(Color.argb(alpha, Color.red(outline), Color.green(outline), Color.blue(outline)));
+            canvas.drawPath(left, p);
+            canvas.drawPath(right, p);
+
+            // Ceramic markings.
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.argb(Math.min(220, alpha), 234, 216, 190));
+            canvas.drawCircle(x - s * 0.52f, y - s * 0.17f, s * 0.13f, p);
+            canvas.drawCircle(x + s * 0.52f, y - s * 0.17f, s * 0.13f, p);
+
+            if (type % 2 == 0) {
+                p.setColor(Color.argb(Math.min(210, alpha), 92, 111, 88));
+                canvas.drawCircle(x - s * 0.66f, y + s * 0.10f, s * 0.08f, p);
+                canvas.drawCircle(x + s * 0.66f, y + s * 0.10f, s * 0.08f, p);
+            } else {
+                p.setColor(Color.argb(Math.min(210, alpha), 156, 88, 76));
+                canvas.drawCircle(x - s * 0.66f, y + s * 0.10f, s * 0.08f, p);
+                canvas.drawCircle(x + s * 0.66f, y + s * 0.10f, s * 0.08f, p);
+            }
+
+            // Body and antennae.
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.argb(alpha, Color.red(body), Color.green(body), Color.blue(body)));
+            canvas.drawOval(new RectF(x - s * 0.11f, y - s * 0.48f, x + s * 0.11f, y + s * 0.48f), p);
+            canvas.drawCircle(x, y - s * 0.50f, s * 0.13f, p);
+
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1f, s * 0.055f));
+            p.setColor(Color.argb(alpha, 202, 183, 159));
+            canvas.drawLine(x - s * 0.04f, y - s * 0.58f, x - s * 0.28f, y - s * 0.88f, p);
+            canvas.drawLine(x + s * 0.04f, y - s * 0.58f, x + s * 0.28f, y - s * 0.88f, p);
+
+            // Glaze shine.
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1f, s * 0.07f));
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setColor(Color.argb(Math.min(155, alpha), 255, 250, 238));
+            canvas.drawLine(x - s * 0.72f, y - s * 0.42f, x - s * 0.48f, y - s * 0.52f, p);
+            canvas.drawLine(x + s * 0.72f, y - s * 0.42f, x + s * 0.48f, y - s * 0.52f, p);
+
+            canvas.restore();
         }
     }
 
