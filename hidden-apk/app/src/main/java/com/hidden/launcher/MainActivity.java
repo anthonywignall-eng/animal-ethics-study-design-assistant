@@ -1071,22 +1071,24 @@ public class MainActivity extends Activity {
 
         if (page == 0) onboardingOne(outer);
         else if (page == 1) onboardingTwo(outer);
-        else onboardingThree(outer);
+        else if (page == 2) onboardingTheme(outer);
+        else if (page == 3) onboardingDoom(outer);
+        else onboardingFinish(outer);
 
         View stretch = new View(this);
         outer.addView(stretch, new LinearLayout.LayoutParams(1, 0, 1f));
 
         LinearLayout footer = new LinearLayout(this);
         footer.setGravity(Gravity.CENTER_VERTICAL);
-        TextView count = text("PAGE " + (page + 1) + " / 3", 12, muted);
-        TextView next = heading(page == 2 ? "Use HIDDEN" : "Next  →", 18);
+        TextView count = text("PAGE " + (page + 1) + " / 5", 12, muted);
+        TextView next = heading(page == 4 ? "Use HIDDEN" : "Next  →", 18);
         next.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         footer.addView(count, new LinearLayout.LayoutParams(0, dp(56), 1f));
         footer.addView(next, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(56)));
         outer.addView(footer);
 
         next.setOnClickListener(v -> {
-            if (page < 2) showOnboarding(page + 1);
+            if (page < 4) showOnboarding(page + 1);
             else {
                 prefs.edit().putInt("onboarding_version", ONBOARDING_VERSION).apply();
                 if (!isDefaultHome()) requestHomeRole();
@@ -1176,15 +1178,6 @@ public class MainActivity extends Activity {
             review.setOnClickListener(v -> showNotificationReview());
             content.addView(review);
         }
-
-        addSectionTitle(content, "DOOM SCROLL");
-        TextView q = heading("How far away should distractions be?", 17);
-        content.addView(q);
-
-        TextView doomLabel = text(doomDistanceLabel(prefs.getInt("doom_screens", 18)), 14, muted);
-        pad(doomLabel, 0, 5, 0, 2);
-        content.addView(doomLabel);
-        content.addView(doomSeekBar(doomLabel));
     }
 
     private TextView pickerCard(String title, String subtitle) {
@@ -1198,40 +1191,98 @@ public class MainActivity extends Activity {
         return t;
     }
 
-    private void onboardingThree(LinearLayout content) {
+    private void onboardingTheme(LinearLayout content) {
+        TextView title = heading("Choose your HIDDEN.", 34);
+        pad(title, 0, 14, 0, 8);
+        content.addView(title);
+
+        TextView copy = text("HOME, DRAWER and HIDDEN can each have their own look. Pick a section, then tap the theme you want.", 15, muted);
+        copy.setLineSpacing(0, 1.22f);
+        content.addView(copy);
+
+        LinearLayout targets = new LinearLayout(this);
+        targets.setGravity(Gravity.CENTER);
+        String[] targetKeys = {"home_theme", "drawer_theme", "hidden_theme"};
+        String[] targetLabels = {"HOME", "DRAWER", "HIDDEN"};
+        for (int i = 0; i < targetKeys.length; i++) {
+            String key = targetKeys[i];
+            boolean selected = key.equals(onboardingThemeTarget);
+            TextView target = text(targetLabels[i], 12, selected ? fg : muted);
+            if (selected) applyStrongTypeface(target);
+            target.setGravity(Gravity.CENTER);
+            target.setBackgroundColor(selected ? panel : Color.TRANSPARENT);
+            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, dp(42), 1f);
+            if (i > 0) tp.leftMargin = dp(5);
+            targets.addView(target, tp);
+            target.setOnClickListener(v -> {
+                onboardingThemeTarget = key;
+                showOnboarding(2);
+            });
+        }
+        LinearLayout.LayoutParams targetLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42));
+        targetLp.topMargin = dp(18);
+        content.addView(targets, targetLp);
+
+        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "8bit"};
+        for (String theme : themes) {
+            boolean selected = theme.equals(themeFor(onboardingThemeTarget));
+            ThemePreviewView preview = new ThemePreviewView(this, theme, selected);
+            preview.setOnClickListener(v -> {
+                SharedPreferences.Editor e = prefs.edit().putString(onboardingThemeTarget, theme);
+                if ("drawer_theme".equals(onboardingThemeTarget)) e.putString("theme_mode", theme);
+                e.apply();
+                if ("drawer_theme".equals(onboardingThemeTarget)) applyPalette();
+                showOnboarding(2);
+            });
+            LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(78));
+            pp.topMargin = dp(9);
+            content.addView(preview, pp);
+        }
+
+        addSectionTitle(content, "SEAMLESS HOME");
+        TextView seamless = text("Use the wallpaper that exactly matches your HOME theme so Android's Home transition has the same surface to show.", 13, muted);
+        seamless.setLineSpacing(0, 1.2f);
+        content.addView(seamless);
+
+        TextView wallpaper = boldAction("Set matching HIDDEN wallpaper");
+        wallpaper.setOnClickListener(v -> openHiddenWallpaperPicker());
+        content.addView(wallpaper);
+    }
+
+    private void onboardingDoom(LinearLayout content) {
+        TextView title = heading("How far away should distractions be?", 34);
+        pad(title, 0, 14, 0, 8);
+        content.addView(title);
+
+        TextView copy = text("Doom Scroll is the distance between the useful part of your phone and the apps you chose to hide.", 15, muted);
+        copy.setLineSpacing(0, 1.22f);
+        content.addView(copy);
+
+        TextView doomLabel = heading(doomDistanceLabel(prefs.getInt("doom_screens", 18)), 17);
+        pad(doomLabel, 0, 24, 0, 4);
+        content.addView(doomLabel);
+        content.addView(doomSeekBar(doomLabel));
+
+        addSectionTitle(content, "NAVIGATION");
+        content.addView(toggleRow("Swipe-up hint", "show_swipe_hint"));
+
+        TextView pauseNote = text("If you repeatedly make the trip to HIDDEN, HIDDEN can offer a 30-minute Doom Scroll pause when you clearly need access.", 13, muted);
+        pauseNote.setLineSpacing(0, 1.2f);
+        pad(pauseNote, 0, 8, 0, 0);
+        content.addView(pauseNote);
+    }
+
+    private void onboardingFinish(LinearLayout content) {
         TextView title = heading("Keep the time thieves out of reach.", 34);
         pad(title, 0, 14, 0, 8);
         content.addView(title);
 
-        TextView copy = text("Pick the look, keep the swipe hint if you want it, then make HIDDEN your Home app.", 16, muted);
+        TextView copy = text("Make HIDDEN your Home app. Everything else stays private, local and deliberately boring.", 16, muted);
         copy.setLineSpacing(0, 1.25f);
         content.addView(copy);
 
-        addSectionTitle(content, "APPEARANCE");
-        content.addView(cycleRow("Launcher theme", themeLabel(), v -> {
-            prefs.edit().putString("theme_mode", nextTheme()).apply();
-            applyPalette();
-            showOnboarding(2);
-        }));
-
-        TextView seamlessNote = text("Want the Home gesture to look completely seamless? Use HIDDEN's matching wallpaper so Android has the same background to show during the transition.", 13, muted);
-        seamlessNote.setLineSpacing(0, 1.2f);
-        pad(seamlessNote, 0, 10, 0, 4);
-        content.addView(seamlessNote);
-
-        TextView seamlessAction = boldAction("Set matching HIDDEN wallpaper");
-        seamlessAction.setOnClickListener(v -> openHiddenWallpaperPicker());
-        content.addView(seamlessAction);
-
-        content.addView(cycleRow("HIDDEN-area theme", hiddenThemeLabel(), v -> {
-            prefs.edit().putString("hidden_theme", nextHiddenTheme()).apply();
-            showOnboarding(2);
-        }));
-
-        content.addView(toggleRow("Swipe-up hint", "show_swipe_hint"));
-
         addSectionTitle(content, "PRIVACY");
-        TextView privacy = text("No account. No analytics. No ads. No tracking. No location access. No notification access. Your settings stay on this phone.", 14, fg);
+        TextView privacy = text("No account. No analytics. No ads. No tracking. No location access. No notification access.", 14, fg);
         privacy.setLineSpacing(0, 1.25f);
         content.addView(privacy);
 
