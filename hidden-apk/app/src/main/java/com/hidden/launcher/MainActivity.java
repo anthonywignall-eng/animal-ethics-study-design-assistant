@@ -13,6 +13,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
+import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
@@ -110,14 +111,29 @@ public class MainActivity extends Activity {
     private EditText flowDrawerSearch;
     private boolean syncingDrawerSearch = false;
     private boolean drawerSearchActive = false;
-    private String renderThemeOverride = null;
-    private String onboardingThemeTarget = "home_theme";
+
+    private TextView homeClockView;
+    private TextView homeDateView;
+    private TextView homeBatteryView;
+    private final List<TextView> drawerClockViews = new ArrayList<>();
+    private final List<TextView> drawerBatteryViews = new ArrayList<>();
+    private TextView accessibilityStatusView;
+    private TextView defaultHomeStatusView;
+
+    private final Runnable uiTicker = new Runnable() {
+        @Override public void run() {
+            updateLiveUtilities();
+            long now = System.currentTimeMillis();
+            long delay = 60000L - (now % 60000L) + 80L;
+            handler.postDelayed(this, delay);
+        }
+    };
     private float notificationSwipeStartX = 0f;
     private float notificationSwipeStartY = 0f;
     private boolean notificationSwipeCandidate = false;
     private boolean notificationSwipeTriggered = false;
 
-    private enum Screen { HOME, SETTINGS, ONBOARDING, PICKER, NOTIFICATION_REVIEW, INTRO }
+    private enum Screen { HOME, SETTINGS, THEME_PICKER, ONBOARDING, PICKER, NOTIFICATION_REVIEW, INTRO }
 
     static class AppItem {
         final String label;
@@ -143,6 +159,63 @@ public class MainActivity extends Activity {
             showIntroWelcome();
         } else {
             showLauncherSurface(true);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        List<AppItem> refreshed = loadApps();
+        if (!sameAppList(apps, refreshed)) {
+            apps = refreshed;
+            if (launcherAdapter != null) launcherAdapter.refreshApps();
+        }
+
+        refreshExternalStateViews();
+        handler.removeCallbacks(uiTicker);
+        uiTicker.run();
+    }
+
+    @Override
+    protected void onPause() {
+        handler.removeCallbacks(uiTicker);
+        super.onPause();
+    }
+
+    private boolean sameAppList(List<AppItem> a, List<AppItem> b) {
+        if (a == null || b == null || a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) {
+            AppItem x = a.get(i);
+            AppItem y = b.get(i);
+            if (!x.pkg.equals(y.pkg) || !x.activity.equals(y.activity) || !x.label.equals(y.label)) return false;
+        }
+        return true;
+    }
+
+    private void refreshExternalStateViews() {
+        if (accessibilityStatusView != null) {
+            accessibilityStatusView.setText(HiddenAccessibilityService.isConnected() ? "ON" : "SET UP");
+        }
+        if (defaultHomeStatusView != null) {
+            defaultHomeStatusView.setText(isDefaultHome() ? "HIDDEN" : "CHANGE");
+        }
+    }
+
+    private void updateLiveUtilities() {
+        String time = new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date());
+        String date = new SimpleDateFormat("EEEE · d MMMM", Locale.getDefault()).format(new Date());
+        String battery = "BATTERY  " + batteryPercent() + "%";
+
+        if (homeClockView != null) homeClockView.setText(time);
+        if (homeDateView != null) homeDateView.setText(date);
+        if (homeBatteryView != null) homeBatteryView.setText(battery);
+
+        for (TextView clock : drawerClockViews) {
+            if (clock != null) clock.setText(time);
+        }
+        for (TextView batteryView : drawerBatteryViews) {
+            if (batteryView != null) batteryView.setText(battery);
         }
     }
 
@@ -188,6 +261,11 @@ public class MainActivity extends Activity {
             return;
         }
 
+        if (currentScreen == Screen.THEME_PICKER) {
+            showSettings();
+            return;
+        }
+
         if (currentScreen == Screen.PICKER || currentScreen == Screen.NOTIFICATION_REVIEW) {
             if (prefs.getInt("onboarding_version", 0) < ONBOARDING_VERSION) showOnboarding(1);
             else showSettings();
@@ -203,19 +281,23 @@ public class MainActivity extends Activity {
     }
 
     private void ensureDefaults() {
-        String legacy = prefs.getString("theme_mode", "system");
-        legacy = normaliseTheme(legacy);
+        String legacy = prefs.getString(
+            "theme_mode",
+            prefs.getString("drawer_theme", prefs.getString("home_theme", "dark"))
+        );
+        String canonical = normaliseTheme(legacy);
 
         SharedPreferences.Editor e = prefs.edit();
         if (!prefs.contains("clock_mode")) e.putString("clock_mode", MODE_HOME);
         if (!prefs.contains("battery_mode")) e.putString("battery_mode", MODE_HOME);
         if (!prefs.contains("show_swipe_hint")) e.putBoolean("show_swipe_hint", true);
-        if (!prefs.contains("home_theme")) e.putString("home_theme", legacy);
-        if (!prefs.contains("drawer_theme")) e.putString("drawer_theme", legacy);
-        if (!prefs.contains("hidden_theme")) e.putString("hidden_theme", legacy);
-        if (!prefs.contains("theme_mode")) e.putString("theme_mode", legacy);
         if (!prefs.contains("doom_screens")) e.putInt("doom_screens", 18);
-        e.apply();
+
+        e.putString("theme_mode", canonical)
+            .remove("home_theme")
+            .remove("drawer_theme")
+            .remove("hidden_theme")
+            .apply();
     }
 
     private String normaliseTheme(String raw) {
@@ -230,12 +312,8 @@ public class MainActivity extends Activity {
         return "dark";
     }
 
-    private String themeFor(String key) {
-        return normaliseTheme(prefs.getString(key, prefs.getString("theme_mode", "dark")));
-    }
-
     private String currentTheme() {
-        return renderThemeOverride != null ? renderThemeOverride : themeFor("drawer_theme");
+        return normaliseTheme(prefs.getString("theme_mode", "dark"));
     }
 
     private boolean isTheme(String name) {
@@ -262,8 +340,7 @@ public class MainActivity extends Activity {
     }
 
     private void applyPalette() {
-        String mode = themeFor("drawer_theme");
-        renderThemeOverride = mode;
+        String mode = currentTheme();
         setPaletteValues(mode);
 
         boolean lightBars = "light".equals(mode) || "doom_light".equals(mode);
@@ -274,8 +351,6 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(bg);
         getWindow().setBackgroundDrawable(new ColorDrawable(bg));
         getWindow().getDecorView().setBackgroundColor(bg);
-
-        renderThemeOverride = null;
     }
 
     private int dp(int value) {
@@ -294,10 +369,8 @@ public class MainActivity extends Activity {
         return id > 0 ? getResources().getDimensionPixelSize(id) : 0;
     }
 
-    private CharSequence globalStyledText(String value) {
-        if (!isDoomTheme()) return value;
-
-        int[] colors = isTheme("doom_light")
+    private int[] doomAccentColors() {
+        return isTheme("doom_light")
             ? new int[]{
                 Color.rgb(92, 43, 37),
                 Color.rgb(54, 78, 49),
@@ -314,6 +387,11 @@ public class MainActivity extends Activity {
                 Color.rgb(229, 180, 188),
                 Color.rgb(174, 209, 195)
             };
+    }
+
+    private CharSequence globalStyledText(String value) {
+        if (!isDoomTheme()) return value;
+        int[] colors = doomAccentColors();
 
         SpannableString styled = new SpannableString(value);
         for (int i = 0; i < value.length(); i++) {
@@ -356,15 +434,9 @@ public class MainActivity extends Activity {
 
     private TextView text(String value, float sp, int color) {
         TextView t = new TextView(this);
-        t.setText(globalStyledText(value));
+        t.setText(value);
         t.setTextSize(sp);
-        t.setTextColor(isDoomTheme() ? fg : color);
-        if (isDoomTheme()) {
-            int shadow = isTheme("doom_light")
-                ? Color.argb(120, 255, 250, 238)
-                : Color.argb(210, 0, 0, 0);
-            t.setShadowLayer(1.8f, 0f, 1f, shadow);
-        }
+        t.setTextColor(color);
         t.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         t.setFontFeatureSettings("kern");
         applyRegularTypeface(t);
@@ -373,6 +445,13 @@ public class MainActivity extends Activity {
 
     private TextView heading(String value, float sp) {
         TextView t = text(value, sp, fg);
+        if (isDoomTheme()) {
+            t.setText(globalStyledText(value));
+            int shadow = isTheme("doom_light")
+                ? Color.argb(125, 255, 250, 238)
+                : Color.argb(220, 0, 0, 0);
+            t.setShadowLayer(1.8f, 0f, 1f, shadow);
+        }
         applyStrongTypeface(t);
         return t;
     }
