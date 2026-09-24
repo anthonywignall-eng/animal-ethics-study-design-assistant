@@ -10,6 +10,7 @@
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowShowWallpaper">false</item>
         <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
         <item name="android:windowDisablePreview">false</item>
     </style>
 </resources>
