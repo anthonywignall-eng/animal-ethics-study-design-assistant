@@ -111,7 +111,6 @@ public class MainActivity extends Activity {
     private TextView homeBatteryView;
     private final List<TextView> drawerClockViews = new ArrayList<>();
     private final List<TextView> drawerBatteryViews = new ArrayList<>();
-    private TextView accessibilityStatusView;
     private TextView defaultHomeStatusView;
     private TextView favouriteCountView;
     private TextView hiddenCountView;
@@ -138,10 +137,6 @@ public class MainActivity extends Activity {
             handler.postDelayed(this, delay);
         }
     };
-    private float notificationSwipeStartX = 0f;
-    private float notificationSwipeStartY = 0f;
-    private boolean notificationSwipeCandidate = false;
-    private boolean notificationSwipeTriggered = false;
 
     private enum Screen { HOME, SETTINGS, THEME_PICKER, ONBOARDING, PICKER, NOTIFICATION_REVIEW, INTRO }
 
@@ -276,9 +271,6 @@ public class MainActivity extends Activity {
     }
 
     private void refreshExternalStateViews() {
-        if (accessibilityStatusView != null) {
-            accessibilityStatusView.setText(HiddenAccessibilityService.isConnected() ? "ON" : "SET UP");
-        }
         if (defaultHomeStatusView != null) {
             defaultHomeStatusView.setText(isDefaultHome() ? "HIDDEN" : "CHANGE");
         }
@@ -669,43 +661,6 @@ public class MainActivity extends Activity {
             if (pos >= 0) launcherRecycler.smoothScrollToPosition(pos);
         });
 
-        launcherRecycler.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
-            @Override
-            public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
-                if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
-                    notificationSwipeCandidate = isHomeFullyClosed();
-                    notificationSwipeTriggered = false;
-                    notificationSwipeStartX = e.getX();
-                    notificationSwipeStartY = e.getY();
-                    return false;
-                }
-
-                if (e.getActionMasked() == MotionEvent.ACTION_MOVE &&
-                    notificationSwipeCandidate &&
-                    !notificationSwipeTriggered &&
-                    isHomeFullyClosed()) {
-
-                    float dx = e.getX() - notificationSwipeStartX;
-                    float dy = e.getY() - notificationSwipeStartY;
-
-                    if (dy > dp(72) && Math.abs(dx) < dy * 0.7f) {
-                        notificationSwipeTriggered = true;
-                        notificationSwipeCandidate = false;
-                        openNotificationShadeFromHome();
-                        return true;
-                    }
-                }
-
-                if (e.getActionMasked() == MotionEvent.ACTION_UP ||
-                    e.getActionMasked() == MotionEvent.ACTION_CANCEL) {
-                    notificationSwipeCandidate = false;
-                    notificationSwipeTriggered = false;
-                }
-
-                return false;
-            }
-        });
-
         launcherRecycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
             boolean insideHidden = false;
 
@@ -759,47 +714,11 @@ public class MainActivity extends Activity {
         if (rewind) launcherRecycler.scrollToPosition(0);
     }
 
-    private boolean isHomeFullyClosed() {
-        if (currentScreen != Screen.HOME ||
-            launcherRecycler == null ||
-            launcherAdapter == null ||
-            launcherAdapter.isSearchMode() ||
-            drawerShelfTargetVisible) {
-            return false;
-        }
-
-        RecyclerView.LayoutManager manager = launcherRecycler.getLayoutManager();
-        if (!(manager instanceof LinearLayoutManager)) return false;
-
-        LinearLayoutManager lm = (LinearLayoutManager)manager;
-        if (lm.findFirstVisibleItemPosition() != 0) return false;
-
-        View home = lm.findViewByPosition(0);
-        return home != null && home.getTop() >= -dp(6);
-    }
-
     private AlertDialog.Builder dialogBuilder() {
         int dialogTheme = useDarkPalette()
             ? android.R.style.Theme_Material_Dialog_Alert
             : android.R.style.Theme_Material_Light_Dialog_Alert;
         return new AlertDialog.Builder(this, dialogTheme);
-    }
-
-    private void openNotificationShadeFromHome() {
-        if (HiddenAccessibilityService.openNotifications()) return;
-
-        dialogBuilder()
-            .setTitle("Enable swipe-down notifications")
-            .setMessage("Android only allows a third-party launcher to open the notification shade through Accessibility. HIDDEN's service does not read screen content or notifications; it only performs this one system action when you swipe down on Home.")
-            .setNegativeButton("Not now", null)
-            .setPositiveButton("Open Accessibility settings", (d, w) -> openAccessibilitySetup())
-            .show();
-    }
-
-    private void openAccessibilitySetup() {
-        try {
-            startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-        } catch (Exception ignored) {}
     }
 
     private void rewindHome(boolean smooth) {
@@ -1178,7 +1097,6 @@ public class MainActivity extends Activity {
 
     private void showSettings(int restoreY) {
         currentScreen = Screen.SETTINGS;
-        accessibilityStatusView = null;
         defaultHomeStatusView = null;
         favouriteCountView = null;
         hiddenCountView = null;
@@ -1227,18 +1145,6 @@ public class MainActivity extends Activity {
         addSectionTitle(content, "HOME");
         content.addView(toggleRow("Swipe-up hint", "show_swipe_hint"));
 
-        LinearLayout accessibilityRow = (LinearLayout)actionRow(
-            "Swipe down notifications",
-            HiddenAccessibilityService.isConnected() ? "ON" : "SET UP",
-            v -> openAccessibilitySetup()
-        );
-        accessibilityStatusView = (TextView)accessibilityRow.getChildAt(1);
-        content.addView(accessibilityRow);
-
-        TextView accessibilityNote = text("Optional Accessibility access is used only to open Android's notification shade from a Home-screen swipe. HIDDEN does not retrieve screen content.", 12, muted);
-        accessibilityNote.setLineSpacing(0, 1.18f);
-        pad(accessibilityNote, 0, 2, 0, 8);
-        content.addView(accessibilityNote);
         LinearLayout favouriteRow = (LinearLayout)actionRow("Favourite apps", selectedCount(essentialSet()) + " SELECTED", v -> showAppPicker(true));
         favouriteCountView = (TextView)favouriteRow.getChildAt(1);
         content.addView(favouriteRow);
@@ -1267,7 +1173,7 @@ public class MainActivity extends Activity {
         defaultHomeStatusView = (TextView)homeRoleRow.getChildAt(1);
         content.addView(homeRoleRow);
 
-        TextView version = text("HIDDEN · v0.7", 12, muted);
+        TextView version = text("HIDDEN · v0.7.1", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
