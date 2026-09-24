@@ -2463,24 +2463,22 @@ public class MainActivity extends Activity {
                 block.addView(title);
 
                 if (hiddenDoom) {
-                    TextView fine = text("fine.", 13, hp.muted);
+                    TextView fine = hiddenLabel("fine.", 13, hp.muted, false);
                     pad(fine, 0, 2, 0, 8);
                     block.addView(fine);
                 } else if ("8bit".equals(prefs.getString("hidden_theme", "dark"))) {
-                    TextView ready = text("SECTOR 00 // READY_", 12, hp.muted);
-                    ready.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-                    ready.getPaint().setAntiAlias(false);
+                    TextView ready = hiddenLabel("SECTOR 00 // READY_", 12, hp.muted, true);
                     pad(ready, 0, 2, 0, 8);
                     block.addView(ready);
                 }
 
                 if (showRepeatPause && !doomPaused()) {
-                    TextView pause = text("You've made this trip a few times. Pause Doom Scroll for 30 minutes?", 14, hp.foreground);
+                    TextView pause = hiddenLabel("You've made this trip a few times. Pause Doom Scroll for 30 minutes?", 14, hp.foreground, false);
                     pause.setLineSpacing(0, 1.2f);
                     pad(pause, 0, 12, 0, 6);
                     block.addView(pause);
 
-                    TextView action = hiddenHeading("Pause for 30 minutes", 15, hp.foreground);
+                    TextView action = hiddenLabel("Pause for 30 minutes", 15, hp.foreground, true);
                     pad(action, 0, 4, 0, 2);
                     action.setOnClickListener(v -> {
                         prefs.edit().putLong("doom_pause_until", System.currentTimeMillis() + HALF_HOUR).apply();
@@ -2497,6 +2495,7 @@ public class MainActivity extends Activity {
                 HiddenPalette hp = hiddenPalette();
                 rewind.setTextColor(hp.foreground);
                 rewind.setBackgroundColor(hp.background);
+                styleHiddenText(rewind, true);
                 rewind.setOnClickListener(v -> rewindHome(true));
             }
         }
@@ -2504,9 +2503,46 @@ public class MainActivity extends Activity {
         @Override public int getItemCount() { return items.size(); }
 
         private TextView hiddenHeading(String value, float sp, int color) {
-            TextView t = text(value, sp, color);
-            applyStrongTypeface(t);
+            return hiddenLabel(value, sp, color, true);
+        }
+
+        private TextView hiddenLabel(String value, float sp, int color, boolean strong) {
+            TextView t = new TextView(MainActivity.this);
+            t.setTextSize(sp);
+            t.setTextColor(color);
+            t.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+            t.setFontFeatureSettings("kern");
+
+            String theme = themeFor("hidden_theme");
+            if ("8bit".equals(theme)) {
+                t.setText(value.toUpperCase(Locale.ROOT));
+                t.setTypeface(Typeface.MONOSPACE, strong ? Typeface.BOLD : Typeface.NORMAL);
+                t.getPaint().setAntiAlias(false);
+                t.setLetterSpacing(0.055f);
+            } else if ("doom_light".equals(theme) || "doom_dark".equals(theme)) {
+                t.setText(earthyDoomText(value));
+                t.setTypeface(Typeface.create("sans-serif-condensed", strong ? Typeface.BOLD : Typeface.NORMAL));
+                t.setLetterSpacing(strong ? 0.055f : 0.035f);
+            } else {
+                t.setText(value);
+                t.setTypeface(Typeface.create("sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
+            }
             return t;
+        }
+
+        private void styleHiddenText(TextView t, boolean strong) {
+            String value = t.getText().toString();
+            String theme = themeFor("hidden_theme");
+            if ("8bit".equals(theme)) {
+                t.setText(value.toUpperCase(Locale.ROOT));
+                t.setTypeface(Typeface.MONOSPACE, strong ? Typeface.BOLD : Typeface.NORMAL);
+                t.getPaint().setAntiAlias(false);
+            } else if ("doom_light".equals(theme) || "doom_dark".equals(theme)) {
+                t.setText(earthyDoomText(value));
+                t.setTypeface(Typeface.create("sans-serif-condensed", strong ? Typeface.BOLD : Typeface.NORMAL));
+            } else {
+                t.setTypeface(Typeface.create("sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
+            }
         }
 
         private void confirmHide(AppItem app) {
