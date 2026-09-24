@@ -33,7 +33,7 @@ public class HiddenWallpaperService extends WallpaperService {
 
         @Override
         public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-            if ("home_theme".equals(key) || "theme_mode".equals(key)) draw();
+            if ("theme_mode".equals(key)) draw();
         }
 
         @Override
@@ -49,8 +49,7 @@ public class HiddenWallpaperService extends WallpaperService {
                 canvas = holder.lockCanvas();
                 if (canvas == null) return;
 
-                String fallback = prefs.getString("theme_mode", "dark");
-                String theme = prefs.getString("home_theme", fallback);
+                String theme = prefs.getString("theme_mode", "dark");
                 ThemeArt.draw(
                     canvas,
                     canvas.getWidth(),
