@@ -29,6 +29,7 @@ import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.TextWatcher;
+import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -96,6 +97,7 @@ public class MainActivity extends Activity {
     private RecyclerView launcherRecycler;
     private LauncherAdapter launcherAdapter;
     private AlphabetRailView alphabetRail;
+    private boolean alphabetRailTargetVisible = false;
 
     private enum Screen { HOME, SETTINGS, ONBOARDING, PICKER, NOTIFICATION_REVIEW, INTRO }
 
@@ -296,6 +298,8 @@ public class MainActivity extends Activity {
         frame.addView(launcherRecycler, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         alphabetRail = new AlphabetRailView(this);
+        alphabetRailTargetVisible = false;
+        alphabetRail.setAlpha(0f);
         alphabetRail.setVisibility(View.INVISIBLE);
         FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(52), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END);
         rp.topMargin = dp(18);
@@ -315,14 +319,15 @@ public class MainActivity extends Activity {
                 LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
                 if (lm == null) return;
                 int first = lm.findFirstVisibleItemPosition();
+                int last = lm.findLastVisibleItemPosition();
                 int journey = launcherAdapter.journeyPosition();
                 int hiddenStart = launcherAdapter.hiddenHeaderPosition();
 
                 boolean showRail = launcherAdapter.query.isEmpty()
                     && first >= launcherAdapter.firstAppPosition()
-                    && (journey < 0 || first < journey);
+                    && (journey < 0 || last < journey);
 
-                alphabetRail.setVisibility(showRail ? View.VISIBLE : View.INVISIBLE);
+                setAlphabetRailVisible(showRail);
 
                 if (hiddenStart >= 0) {
                     if (!insideHidden && first >= hiddenStart) {
@@ -349,6 +354,28 @@ public class MainActivity extends Activity {
             launcherRecycler.smoothScrollToPosition(0);
         } else {
             launcherRecycler.scrollToPosition(0);
+        }
+    }
+
+    private void setAlphabetRailVisible(boolean visible) {
+        if (alphabetRail == null || alphabetRailTargetVisible == visible) return;
+        alphabetRailTargetVisible = visible;
+        alphabetRail.animate().cancel();
+
+        if (visible) {
+            alphabetRail.setVisibility(View.VISIBLE);
+            alphabetRail.setAlpha(0f);
+            alphabetRail.animate().alpha(1f).setDuration(170).start();
+        } else {
+            alphabetRail.animate()
+                .alpha(0f)
+                .setDuration(180)
+                .withEndAction(() -> {
+                    if (!alphabetRailTargetVisible && alphabetRail != null) {
+                        alphabetRail.setVisibility(View.INVISIBLE);
+                    }
+                })
+                .start();
         }
     }
 
@@ -421,7 +448,7 @@ public class MainActivity extends Activity {
         top.setBackgroundColor(bg);
         pad(top, 26, 42, 58, 14);
 
-        TextView settings = heading("Hidden Settings", 19);
+        TextView settings = heading("HIDDEN Settings", 19);
         pad(settings, 0, 5, 0, 10);
         settings.setOnClickListener(v -> showSettings());
         top.addView(settings);
@@ -450,6 +477,7 @@ public class MainActivity extends Activity {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 if (launcherAdapter != null) launcherAdapter.setQuery(s.toString());
+                if (!s.toString().trim().isEmpty()) setAlphabetRailVisible(false);
             }
             @Override public void afterTextChanged(Editable s) {}
         });
@@ -491,7 +519,7 @@ public class MainActivity extends Activity {
     private void renderWeather(TextView target) {
         String city = prefs.getString("weather_city", "").trim();
         if (city.isEmpty()) {
-            target.setText("Weather · choose a city in Hidden Settings");
+            target.setText("Weather · choose a city in HIDDEN Settings");
             return;
         }
 
@@ -521,7 +549,7 @@ public class MainActivity extends Activity {
         pad(content, 26, 42, 26, 60);
         scroll.addView(content);
 
-        TextView title = heading("Hidden Settings", 36);
+        TextView title = heading("HIDDEN Settings", 36);
         content.addView(title);
 
         TextView back = text("‹ home", 15, muted);
@@ -558,15 +586,15 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Favourite apps", selectedCount(essentialSet()) + " selected", v -> showAppPicker(true)));
 
         addSectionTitle(content, "HIDDEN");
-        content.addView(actionRow("Hidden apps", selectedCount(hiddenSet()) + " hidden", v -> showAppPicker(false)));
-        content.addView(cycleRow("Hidden-area theme", hiddenThemeLabel(), v -> {
+        content.addView(actionRow("HIDDEN apps", selectedCount(hiddenSet()) + " hidden", v -> showAppPicker(false)));
+        content.addView(cycleRow("HIDDEN-area theme", hiddenThemeLabel(), v -> {
             prefs.edit().putString("hidden_theme", nextHiddenTheme()).apply();
             showSettings();
         }));
         content.addView(actionRow("Review notifications", "Android settings", v -> showNotificationReview()));
 
         addSectionTitle(content, "WEATHER");
-        TextView note = text("Hidden uses only the place you type here. It never asks Android for your location.", 14, muted);
+        TextView note = text("HIDDEN uses only the place you type here. It never asks Android for your location.", 14, muted);
         note.setLineSpacing(0, 1.2f);
         pad(note, 0, 0, 0, 10);
         content.addView(note);
@@ -616,9 +644,9 @@ public class MainActivity extends Activity {
         content.addView(internet);
 
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
-        content.addView(actionRow("Default Home app", isDefaultHome() ? "Hidden" : "change", v -> requestHomeRole()));
+        content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("Hidden · v0.3", 12, muted);
+        TextView version = text("HIDDEN · v0.3.1", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -751,7 +779,7 @@ public class MainActivity extends Activity {
         brand.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         welcome.addView(brand);
 
-        TextView title = heading("Welcome to Hidden Launcher", 36);
+        TextView title = heading("Welcome to HIDDEN Launcher", 36);
         pad(title, 0, 10, 0, 10);
         welcome.addView(title);
 
@@ -800,7 +828,7 @@ public class MainActivity extends Activity {
         LinearLayout footer = new LinearLayout(this);
         footer.setGravity(Gravity.CENTER_VERTICAL);
         TextView count = text("PAGE " + (page + 1) + " / 3", 12, muted);
-        TextView next = heading(page == 2 ? "Use Hidden" : "Next  →", 18);
+        TextView next = heading(page == 2 ? "Use HIDDEN" : "Next  →", 18);
         next.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         footer.addView(count, new LinearLayout.LayoutParams(0, dp(56), 1f));
         footer.addView(next, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(56)));
@@ -899,7 +927,7 @@ public class MainActivity extends Activity {
         pad(title, 0, 14, 0, 8);
         content.addView(title);
 
-        TextView copy = text("Favourite apps stay near your thumb. Hidden apps stay out of sight. Less is more. Especially time.", 16, muted);
+        TextView copy = text("Favourite apps stay near your thumb. HIDDEN apps stay out of sight. Less is more. Especially time.", 16, muted);
         copy.setLineSpacing(0, 1.25f);
         content.addView(copy);
 
@@ -907,7 +935,7 @@ public class MainActivity extends Activity {
         fav.setOnClickListener(v -> showAppPicker(true));
         content.addView(fav);
 
-        TextView hidden = pickerCard("Hidden apps", selectedCount(hiddenSet()) + " hidden");
+        TextView hidden = pickerCard("HIDDEN apps", selectedCount(hiddenSet()) + " hidden");
         hidden.setOnClickListener(v -> showAppPicker(false));
         content.addView(hidden);
 
@@ -916,7 +944,7 @@ public class MainActivity extends Activity {
             pad(noteTitle, 0, 20, 0, 4);
             content.addView(noteTitle);
 
-            TextView note = text("Their notifications can still come looking for you. Consider turning those notifications off yourself. Hidden will never request notification access.", 14, muted);
+            TextView note = text("Their notifications can still come looking for you. Consider turning those notifications off yourself. HIDDEN will never request notification access.", 14, muted);
             note.setLineSpacing(0, 1.2f);
             content.addView(note);
 
@@ -951,7 +979,7 @@ public class MainActivity extends Activity {
         pad(title, 0, 14, 0, 8);
         content.addView(title);
 
-        TextView copy = text("Pick the look, keep the swipe hint if you want it, then make Hidden your Home app.", 16, muted);
+        TextView copy = text("Pick the look, keep the swipe hint if you want it, then make HIDDEN your Home app.", 16, muted);
         copy.setLineSpacing(0, 1.25f);
         content.addView(copy);
 
@@ -962,7 +990,7 @@ public class MainActivity extends Activity {
             showOnboarding(2);
         }));
 
-        content.addView(cycleRow("Hidden-area theme", hiddenThemeLabel(), v -> {
+        content.addView(cycleRow("HIDDEN-area theme", hiddenThemeLabel(), v -> {
             prefs.edit().putString("hidden_theme", nextHiddenTheme()).apply();
             showOnboarding(2);
         }));
@@ -974,12 +1002,12 @@ public class MainActivity extends Activity {
         privacy.setLineSpacing(0, 1.25f);
         content.addView(privacy);
 
-        TextView weather = text("Weather is optional. If enabled, Hidden sends only the place name you typed to the weather provider.", 13, muted);
+        TextView weather = text("Weather is optional. If enabled, HIDDEN sends only the place name you typed to the weather provider.", 13, muted);
         weather.setLineSpacing(0, 1.25f);
         pad(weather, 0, 10, 0, 18);
         content.addView(weather);
 
-        TextView homeStatus = boldAction(isDefaultHome() ? "Hidden is already your Home app" : "Choose Hidden as your Home app");
+        TextView homeStatus = boldAction(isDefaultHome() ? "HIDDEN is already your Home app" : "Choose HIDDEN as your Home app");
         homeStatus.setOnClickListener(v -> requestHomeRole());
         content.addView(homeStatus);
     }
@@ -1060,10 +1088,10 @@ public class MainActivity extends Activity {
         pad(content, 26, 42, 26, 40);
         scroll.addView(content);
 
-        TextView title = heading("Hidden app notifications", 30);
+        TextView title = heading("HIDDEN app notifications", 30);
         content.addView(title);
 
-        TextView copy = text("Hidden won't read or control your notifications. Tap an app below to open Android's own notification settings.", 14, muted);
+        TextView copy = text("HIDDEN won't read or control your notifications. Tap an app below to open Android's own notification settings.", 14, muted);
         copy.setLineSpacing(0, 1.2f);
         pad(copy, 0, 8, 0, 16);
         content.addView(copy);
@@ -1276,7 +1304,7 @@ public class MainActivity extends Activity {
         c.setConnectTimeout(7000);
         c.setReadTimeout(7000);
         c.setRequestProperty("Accept", "application/json");
-        c.setRequestProperty("User-Agent", "HiddenLauncher/0.3");
+        c.setRequestProperty("User-Agent", "HiddenLauncher/0.3.1");
 
         try {
             int code = c.getResponseCode();
@@ -1367,7 +1395,7 @@ public class MainActivity extends Activity {
                 c.drawText("Phone", x + dp(14), y + h - dp(44), p);
                 c.drawText("Camera", x + dp(14), y + h - dp(26), p);
             } else {
-                c.drawText("Hidden Settings", x + dp(14), y + dp(48), p);
+                c.drawText("HIDDEN Settings", x + dp(14), y + dp(48), p);
                 c.drawText("4:38 · Battery 72%", x + dp(14), y + dp(66), p);
                 c.drawText("Calculator", x + dp(14), y + dp(94), p);
                 c.drawText("Camera", x + dp(14), y + dp(112), p);
@@ -1752,6 +1780,11 @@ public class MainActivity extends Activity {
             pad(row, 26, 0, 58, 0);
 
             TextView label = text("", 18, fg);
+            label.setSingleLine(true);
+            label.setMaxLines(1);
+            label.setEllipsize(TextUtils.TruncateAt.END);
+            label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+            label.setIncludeFontPadding(false);
             row.addView(label, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
             return new AppHolder(row, label);
         }
@@ -1786,7 +1819,7 @@ public class MainActivity extends Activity {
                 HiddenPalette hp = hiddenPalette();
                 block.setBackgroundColor(hp.background);
 
-                TextView title = hiddenHeading("doom".equals(prefs.getString("hidden_theme", "dark")) ? "DOOM SCROLL" : "hidden", 36, hp.foreground);
+                TextView title = hiddenHeading("doom".equals(prefs.getString("hidden_theme", "dark")) ? "DOOM SCROLL" : "HIDDEN", 36, hp.foreground);
                 block.addView(title);
 
                 if ("doom".equals(prefs.getString("hidden_theme", "dark"))) {
