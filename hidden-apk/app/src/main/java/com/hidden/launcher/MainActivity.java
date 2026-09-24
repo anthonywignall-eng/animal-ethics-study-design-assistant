@@ -112,6 +112,10 @@ public class MainActivity extends Activity {
     private boolean drawerSearchActive = false;
     private String renderThemeOverride = null;
     private String onboardingThemeTarget = "home_theme";
+    private float notificationSwipeStartX = 0f;
+    private float notificationSwipeStartY = 0f;
+    private boolean notificationSwipeCandidate = false;
+    private boolean notificationSwipeTriggered = false;
 
     private enum Screen { HOME, SETTINGS, ONBOARDING, PICKER, NOTIFICATION_REVIEW, INTRO }
 
@@ -293,14 +297,23 @@ public class MainActivity extends Activity {
     private CharSequence globalStyledText(String value) {
         if (!isDoomTheme()) return value;
 
-        int[] colors = {
-            Color.rgb(205, 146, 129),
-            Color.rgb(168, 174, 137),
-            Color.rgb(202, 171, 112),
-            Color.rgb(143, 139, 154),
-            Color.rgb(190, 154, 146),
-            Color.rgb(151, 168, 157)
-        };
+        int[] colors = isTheme("doom_light")
+            ? new int[]{
+                Color.rgb(92, 43, 37),
+                Color.rgb(54, 78, 49),
+                Color.rgb(105, 72, 27),
+                Color.rgb(55, 61, 91),
+                Color.rgb(92, 49, 67),
+                Color.rgb(43, 77, 67)
+            }
+            : new int[]{
+                Color.rgb(239, 169, 146),
+                Color.rgb(194, 211, 163),
+                Color.rgb(239, 203, 123),
+                Color.rgb(181, 176, 211),
+                Color.rgb(229, 180, 188),
+                Color.rgb(174, 209, 195)
+            };
 
         SpannableString styled = new SpannableString(value);
         for (int i = 0; i < value.length(); i++) {
@@ -346,6 +359,12 @@ public class MainActivity extends Activity {
         t.setText(globalStyledText(value));
         t.setTextSize(sp);
         t.setTextColor(isDoomTheme() ? fg : color);
+        if (isDoomTheme()) {
+            int shadow = isTheme("doom_light")
+                ? Color.argb(120, 255, 250, 238)
+                : Color.argb(210, 0, 0, 0);
+            t.setShadowLayer(1.8f, 0f, 1f, shadow);
+        }
         t.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         t.setFontFeatureSettings("kern");
         applyRegularTypeface(t);
@@ -452,6 +471,43 @@ public class MainActivity extends Activity {
             if (pos >= 0) launcherRecycler.smoothScrollToPosition(pos);
         });
 
+        launcherRecycler.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+            @Override
+            public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
+                if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    notificationSwipeCandidate = isHomeFullyClosed();
+                    notificationSwipeTriggered = false;
+                    notificationSwipeStartX = e.getX();
+                    notificationSwipeStartY = e.getY();
+                    return false;
+                }
+
+                if (e.getActionMasked() == MotionEvent.ACTION_MOVE &&
+                    notificationSwipeCandidate &&
+                    !notificationSwipeTriggered &&
+                    isHomeFullyClosed()) {
+
+                    float dx = e.getX() - notificationSwipeStartX;
+                    float dy = e.getY() - notificationSwipeStartY;
+
+                    if (dy > dp(72) && Math.abs(dx) < dy * 0.7f) {
+                        notificationSwipeTriggered = true;
+                        notificationSwipeCandidate = false;
+                        openNotificationShadeFromHome();
+                        return true;
+                    }
+                }
+
+                if (e.getActionMasked() == MotionEvent.ACTION_UP ||
+                    e.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    notificationSwipeCandidate = false;
+                    notificationSwipeTriggered = false;
+                }
+
+                return false;
+            }
+        });
+
         launcherRecycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
             boolean insideHidden = false;
 
@@ -503,6 +559,42 @@ public class MainActivity extends Activity {
 
         setContentView(frame);
         if (rewind) launcherRecycler.scrollToPosition(0);
+    }
+
+    private boolean isHomeFullyClosed() {
+        if (currentScreen != Screen.HOME ||
+            launcherRecycler == null ||
+            launcherAdapter == null ||
+            launcherAdapter.isSearchMode() ||
+            drawerShelfTargetVisible) {
+            return false;
+        }
+
+        RecyclerView.LayoutManager manager = launcherRecycler.getLayoutManager();
+        if (!(manager instanceof LinearLayoutManager)) return false;
+
+        LinearLayoutManager lm = (LinearLayoutManager)manager;
+        if (lm.findFirstVisibleItemPosition() != 0) return false;
+
+        View home = lm.findViewByPosition(0);
+        return home != null && home.getTop() >= -dp(2);
+    }
+
+    private void openNotificationShadeFromHome() {
+        if (HiddenAccessibilityService.openNotifications()) return;
+
+        new AlertDialog.Builder(this)
+            .setTitle("Enable swipe-down notifications")
+            .setMessage("Android only allows a third-party launcher to open the notification shade through Accessibility. HIDDEN's service does not read screen content or notifications; it only performs this one system action when you swipe down on Home.")
+            .setNegativeButton("Not now", null)
+            .setPositiveButton("Open Accessibility settings", (d, w) -> openAccessibilitySetup())
+            .show();
+    }
+
+    private void openAccessibilitySetup() {
+        try {
+            startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+        } catch (Exception ignored) {}
     }
 
     private void rewindHome(boolean smooth) {
@@ -967,6 +1059,15 @@ public class MainActivity extends Activity {
 
         addSectionTitle(content, "HOME");
         content.addView(toggleRow("Swipe-up hint", "show_swipe_hint"));
+        content.addView(actionRow(
+            "Swipe down notifications",
+            HiddenAccessibilityService.isConnected() ? "ON" : "SET UP",
+            v -> openAccessibilitySetup()
+        ));
+        TextView accessibilityNote = text("Optional Accessibility access is used only to open Android's notification shade from a Home-screen swipe. HIDDEN does not retrieve screen content.", 12, muted);
+        accessibilityNote.setLineSpacing(0, 1.18f);
+        pad(accessibilityNote, 0, 2, 0, 8);
+        content.addView(accessibilityNote);
         content.addView(actionRow("Favourite apps", selectedCount(essentialSet()) + " selected", v -> showAppPicker(true)));
 
         addSectionTitle(content, "HIDDEN");
@@ -1009,7 +1110,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.6.2", 12, muted);
+        TextView version = text("HIDDEN · v0.6.3", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
