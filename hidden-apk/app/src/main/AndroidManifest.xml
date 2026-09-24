@@ -16,6 +16,18 @@
         android:theme="@style/Theme.Hidden"
         android:usesCleartextTraffic="false">
 
+        <service
+            android:name=".HiddenWallpaperService"
+            android:exported="true"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/hidden_wallpaper" />
+        </service>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
