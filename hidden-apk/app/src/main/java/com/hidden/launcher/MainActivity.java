@@ -36,6 +36,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -79,7 +80,7 @@ public class MainActivity extends Activity {
     private static final String MODE_OFF = "off";
     private static final long HALF_HOUR = 30L * 60L * 1000L;
     private static final long REPEAT_WINDOW = 2L * 60L * 1000L;
-    private static final int ONBOARDING_VERSION = 3;
+    private static final int ONBOARDING_VERSION = 4;
 
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -288,6 +289,13 @@ public class MainActivity extends Activity {
 
         FrameLayout frame = new FrameLayout(this);
         frame.setBackgroundColor(bg);
+        frame.setOnApplyWindowInsetsListener((v, insets) -> {
+            int top = insets.getSystemWindowInsetTop();
+            int bottom = insets.getSystemWindowInsetBottom();
+            v.setPadding(0, top, 0, bottom);
+            return insets;
+        });
+        frame.requestApplyInsets();
 
         launcherRecycler = new RecyclerView(this);
         launcherRecycler.setLayoutManager(new LinearLayoutManager(this));
@@ -493,15 +501,15 @@ public class MainActivity extends Activity {
             String cached = cachedWeather();
             if (!cached.isEmpty()) bits.add(cached);
             else {
-                String city = prefs.getString("weather_city", "").trim();
-                bits.add(city.isEmpty() ? "Weather off" : city + " · checking");
+                String place = prefs.getString("weather_place_label", "").trim();
+                bits.add(place.isEmpty() ? "Weather · choose place" : place + " · checking");
             }
         }
         return join(bits, "   ·   ");
     }
 
     private void renderDrawerWeather(TextView target) {
-        String city = prefs.getString("weather_city", "").trim();
+        String city = prefs.getString("weather_place_label", "").trim();
         if (city.isEmpty()) return;
 
         final String timePart = modeInDrawer("clock_mode") ? new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()) : "";
@@ -517,16 +525,16 @@ public class MainActivity extends Activity {
     }
 
     private void renderWeather(TextView target) {
-        String city = prefs.getString("weather_city", "").trim();
-        if (city.isEmpty()) {
-            target.setText("Weather · choose a city in HIDDEN Settings");
+        String place = prefs.getString("weather_place_label", "").trim();
+        if (place.isEmpty() || prefs.getString("weather_lat", "").isEmpty() || prefs.getString("weather_lon", "").isEmpty()) {
+            target.setText("Weather · choose a real place in HIDDEN Settings");
             return;
         }
 
         String cached = cachedWeather();
-        target.setText(cached.isEmpty() ? city + " · checking weather" : cached);
+        target.setText(cached.isEmpty() ? place + " · checking weather" : cached);
 
-        fetchWeatherValue(city, (ok, value) -> {
+        fetchWeatherValue(place, (ok, value) -> {
             if (target.getWindowToken() != null) target.setText(value);
         });
     }
@@ -538,6 +546,10 @@ public class MainActivity extends Activity {
     }
 
     private void showSettings() {
+        showSettings(0);
+    }
+
+    private void showSettings(int restoreY) {
         currentScreen = Screen.SETTINGS;
         applyPalette();
 
@@ -572,7 +584,8 @@ public class MainActivity extends Activity {
         pause.setOnClickListener(v -> {
             if (doomPaused()) prefs.edit().putLong("doom_pause_until", 0L).apply();
             else prefs.edit().putLong("doom_pause_until", System.currentTimeMillis() + HALF_HOUR).apply();
-            showSettings();
+            doomStatus.setText(doomStatusText());
+            pause.setText(doomPaused() ? "Resume Doom Scroll now" : "Pause Doom Scroll for 30 minutes");
         });
         content.addView(pause);
 
@@ -589,7 +602,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("HIDDEN apps", selectedCount(hiddenSet()) + " hidden", v -> showAppPicker(false)));
         content.addView(cycleRow("HIDDEN-area theme", hiddenThemeLabel(), v -> {
             prefs.edit().putString("hidden_theme", nextHiddenTheme()).apply();
-            showSettings();
+            showSettings(scroll.getScrollY());
         }));
         content.addView(actionRow("Review notifications", "Android settings", v -> showNotificationReview()));
 
@@ -601,37 +614,44 @@ public class MainActivity extends Activity {
 
         EditText city = new EditText(this);
         city.setSingleLine(true);
-        city.setHint("Adelaide, South Australia");
-        city.setText(prefs.getString("weather_city", ""));
+        city.setHint("Search for a place · Adelaide");
+        String selectedPlace = prefs.getString("weather_place_label", "");
+        city.setText(selectedPlace.isEmpty() ? prefs.getString("weather_city", "") : selectedPlace);
         city.setTextColor(fg);
         city.setHintTextColor(muted);
         city.setTextSize(16);
         city.setBackgroundColor(panel);
         pad(city, 12, 8, 12, 8);
         content.addView(city, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+        city.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) revealAboveKeyboard(city);
+        });
 
-        TextView weatherResult = text("", 13, muted);
+        TextView weatherResult = text(
+            selectedPlace.isEmpty() ? "No real place selected yet." : "Selected · " + selectedPlace,
+            13,
+            muted
+        );
         pad(weatherResult, 0, 8, 0, 2);
         content.addView(weatherResult);
 
-        TextView saveTest = boldAction("Save + test weather");
-        saveTest.setOnClickListener(v -> {
-            String place = city.getText().toString().trim();
-            prefs.edit().putString("weather_city", place).apply();
-            weatherResult.setText("Testing…");
-            if (place.isEmpty()) {
-                weatherResult.setText("Enter a city first.");
+        TextView choosePlace = boldAction("Find and choose place");
+        choosePlace.setOnClickListener(v -> {
+            String query = city.getText().toString().trim();
+            if (query.isEmpty()) {
+                weatherResult.setText("Type a city or town first.");
                 return;
             }
-            fetchWeatherValue(place, (ok, value) -> weatherResult.setText(ok ? "Working · " + value : value));
+            chooseWeatherPlace(query, city, weatherResult);
         });
-        content.addView(saveTest);
+        content.addView(choosePlace);
 
         addSectionTitle(content, "APPEARANCE");
         content.addView(cycleRow("Theme", themeLabel(), v -> {
+            int y = scroll.getScrollY();
             prefs.edit().putString("theme_mode", nextTheme()).apply();
             applyPalette();
-            showSettings();
+            showSettings(y);
         }));
 
         addSectionTitle(content, "ABOUT HIDDEN");
@@ -646,11 +666,29 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.3.1", 12, muted);
+        TextView version = text("HIDDEN · v0.3.2", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
         setContentView(scroll);
+        if (restoreY > 0) scroll.post(() -> scroll.scrollTo(0, restoreY));
+    }
+
+    private void revealAboveKeyboard(View child) {
+        child.postDelayed(() -> {
+            ViewParent p = child.getParent();
+            while (p != null) {
+                if (p instanceof ScrollView) {
+                    ScrollView sv = (ScrollView)p;
+                    Rect r = new Rect();
+                    child.getDrawingRect(r);
+                    sv.offsetDescendantRectToMyCoords(child, r);
+                    sv.smoothScrollTo(0, Math.max(0, r.top - dp(110)));
+                    break;
+                }
+                p = p.getParent();
+            }
+        }, 260);
     }
 
     private TextView boldAction(String label) {
@@ -675,8 +713,9 @@ public class MainActivity extends Activity {
         row.addView(left, new LinearLayout.LayoutParams(0, dp(50), 1f));
         row.addView(right, new LinearLayout.LayoutParams(dp(110), dp(50)));
         row.setOnClickListener(v -> {
-            prefs.edit().putString(key, nextMode(prefs.getString(key, MODE_OFF))).apply();
-            showSettings();
+            String next = nextMode(prefs.getString(key, MODE_OFF));
+            prefs.edit().putString(key, next).apply();
+            right.setText(modeLabel(next));
         });
         return row;
     }
@@ -689,8 +728,9 @@ public class MainActivity extends Activity {
         row.addView(left, new LinearLayout.LayoutParams(0, dp(50), 1f));
         row.addView(right, new LinearLayout.LayoutParams(dp(90), dp(50)));
         row.setOnClickListener(v -> {
-            prefs.edit().putBoolean(key, !prefs.getBoolean(key, true)).apply();
-            showSettings();
+            boolean next = !prefs.getBoolean(key, true);
+            prefs.edit().putBoolean(key, next).apply();
+            right.setText(next ? "ON" : "OFF");
         });
         return row;
     }
@@ -855,11 +895,6 @@ public class MainActivity extends Activity {
         copy.setLineSpacing(0, 1.25f);
         content.addView(copy);
 
-        UtilityPreviewView preview = new UtilityPreviewView(this);
-        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(180));
-        pp.topMargin = dp(18);
-        content.addView(preview, pp);
-
         addSectionTitle(content, "UTILITIES");
         content.addView(onboardingModeRow("Clock", "clock_mode"));
         content.addView(onboardingModeRow("Weather", "weather_mode"));
@@ -868,8 +903,9 @@ public class MainActivity extends Activity {
         if (!MODE_OFF.equals(prefs.getString("weather_mode", MODE_OFF))) {
             EditText city = new EditText(this);
             city.setSingleLine(true);
-            city.setHint("Weather city · Adelaide, South Australia");
-            city.setText(prefs.getString("weather_city", ""));
+            city.setHint("Search for a place · Adelaide");
+            String selectedPlace = prefs.getString("weather_place_label", "");
+            city.setText(selectedPlace.isEmpty() ? prefs.getString("weather_city", "") : selectedPlace);
             city.setTextColor(fg);
             city.setHintTextColor(muted);
             city.setTextSize(16);
@@ -878,13 +914,28 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50));
             cp.topMargin = dp(14);
             content.addView(city, cp);
-
-            TextView save = boldAction("Save weather city");
-            save.setOnClickListener(v -> {
-                prefs.edit().putString("weather_city", city.getText().toString().trim()).apply();
-                save.setText("Saved");
+            city.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus) revealAboveKeyboard(city);
             });
-            content.addView(save);
+
+            TextView selected = text(
+                selectedPlace.isEmpty() ? "No real place selected yet." : "Selected · " + selectedPlace,
+                13,
+                muted
+            );
+            pad(selected, 0, 7, 0, 0);
+            content.addView(selected);
+
+            TextView choose = boldAction("Find and choose place");
+            choose.setOnClickListener(v -> {
+                String query = city.getText().toString().trim();
+                if (query.isEmpty()) {
+                    selected.setText("Type a city or town first.");
+                    return;
+                }
+                chooseWeatherPlace(query, city, selected);
+            });
+            content.addView(choose);
         }
     }
 
@@ -1253,28 +1304,138 @@ public class MainActivity extends Activity {
         void onResult(boolean ok, String value);
     }
 
-    private void fetchWeatherValue(String city, WeatherCallback callback) {
+    static class PlaceChoice {
+        final String label;
+        final double lat;
+        final double lon;
+
+        PlaceChoice(String label, double lat, double lon) {
+            this.label = label;
+            this.lat = lat;
+            this.lon = lon;
+        }
+    }
+
+    private interface PlaceSearchCallback {
+        void onResult(List<PlaceChoice> places, String error);
+    }
+
+    private void chooseWeatherPlace(String query, EditText input, TextView status) {
+        status.setText("Searching…");
+        searchPlaces(query, (places, error) -> {
+            if (places.isEmpty()) {
+                status.setText(error == null ? "No matching places found." : error);
+                return;
+            }
+
+            String[] labels = new String[places.size()];
+            for (int i = 0; i < places.size(); i++) labels[i] = places.get(i).label;
+
+            new AlertDialog.Builder(MainActivity.this)
+                .setTitle("Choose weather place")
+                .setItems(labels, (dialog, which) -> {
+                    PlaceChoice p = places.get(which);
+                    prefs.edit()
+                        .putString("weather_city", p.label)
+                        .putString("weather_place_label", p.label)
+                        .putString("weather_lat", Double.toString(p.lat))
+                        .putString("weather_lon", Double.toString(p.lon))
+                        .remove("last_weather")
+                        .putLong("last_weather_at", 0L)
+                        .apply();
+
+                    input.setText(p.label);
+                    input.setSelection(input.length());
+                    status.setText("Selected · " + p.label + " · checking weather…");
+
+                    fetchWeatherValue(p.label, (ok, value) -> {
+                        status.setText(ok ? "Selected · " + value : value);
+                    });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        });
+    }
+
+    private void searchPlaces(String query, PlaceSearchCallback callback) {
+        new Thread(() -> {
+            List<PlaceChoice> places = new ArrayList<>();
+            String error = null;
+            try {
+                String q = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8.toString());
+                JSONObject geo = getJson("https://geocoding-api.open-meteo.com/v1/search?name=" + q + "&count=8&language=en&format=json");
+                JSONArray results = geo.optJSONArray("results");
+
+                if ((results == null || results.length() == 0) && query.contains(",")) {
+                    String fallback = query.split(",")[0].trim();
+                    q = URLEncoder.encode(fallback, StandardCharsets.UTF_8.toString());
+                    geo = getJson("https://geocoding-api.open-meteo.com/v1/search?name=" + q + "&count=8&language=en&format=json");
+                    results = geo.optJSONArray("results");
+                }
+
+                if (results != null) {
+                    for (int i = 0; i < results.length(); i++) {
+                        JSONObject place = results.getJSONObject(i);
+                        String name = place.optString("name", "");
+                        String admin = place.optString("admin1", "");
+                        String country = place.optString("country", "");
+                        if (name.isEmpty()) continue;
+
+                        StringBuilder label = new StringBuilder(name);
+                        if (!admin.isEmpty() && !admin.equalsIgnoreCase(name)) label.append(", ").append(admin);
+                        if (!country.isEmpty()) label.append(", ").append(country);
+
+                        places.add(new PlaceChoice(
+                            label.toString(),
+                            place.getDouble("latitude"),
+                            place.getDouble("longitude")
+                        ));
+                    }
+                }
+
+                if (places.isEmpty()) error = "No matching places found.";
+            } catch (Exception e) {
+                error = "Couldn't search places. Check your internet connection.";
+            }
+
+            String finalError = error;
+            runOnUiThread(() -> callback.onResult(places, finalError));
+        }).start();
+    }
+
+    private void fetchWeatherValue(String ignoredLabel, WeatherCallback callback) {
+        String latRaw = prefs.getString("weather_lat", "");
+        String lonRaw = prefs.getString("weather_lon", "");
+        String label = prefs.getString("weather_place_label", "").trim();
+
+        if (latRaw.isEmpty() || lonRaw.isEmpty() || label.isEmpty()) {
+            callback.onResult(false, "Choose a real weather place first.");
+            return;
+        }
+
         new Thread(() -> {
             boolean ok = false;
             String result;
             try {
-                JSONObject place = geocode(city);
-                double lat = place.getDouble("latitude");
-                double lon = place.getDouble("longitude");
-                String name = place.optString("name", city);
-                String admin = place.optString("admin1", "");
-                String label = admin.isEmpty() || admin.equalsIgnoreCase(name) ? name : name + ", " + admin;
-
-                JSONObject forecast = getJson("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m,weather_code&timezone=auto&forecast_days=1");
+                double lat = Double.parseDouble(latRaw);
+                double lon = Double.parseDouble(lonRaw);
+                JSONObject forecast = getJson(
+                    "https://api.open-meteo.com/v1/forecast?latitude=" + lat +
+                    "&longitude=" + lon +
+                    "&current=temperature_2m,weather_code&timezone=auto&forecast_days=1"
+                );
                 JSONObject current = forecast.getJSONObject("current");
                 int temp = (int)Math.round(current.getDouble("temperature_2m"));
                 int code = current.optInt("weather_code", -1);
 
                 result = label + " · " + temp + "° · " + weatherLabel(code);
                 ok = true;
-                prefs.edit().putString("last_weather", result).putLong("last_weather_at", System.currentTimeMillis()).apply();
+                prefs.edit()
+                    .putString("last_weather", result)
+                    .putLong("last_weather_at", System.currentTimeMillis())
+                    .apply();
             } catch (Exception e) {
-                result = city + " · weather unavailable";
+                result = label + " · weather unavailable";
             }
 
             boolean finalOk = ok;
@@ -1283,28 +1444,12 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    private JSONObject geocode(String city) throws Exception {
-        String q = URLEncoder.encode(city.trim(), StandardCharsets.UTF_8.toString());
-        JSONObject geo = getJson("https://geocoding-api.open-meteo.com/v1/search?name=" + q + "&count=5&language=en&format=json");
-        JSONArray results = geo.optJSONArray("results");
-
-        if (results == null || results.length() == 0) {
-            String fallback = city.split(",")[0].trim();
-            q = URLEncoder.encode(fallback, StandardCharsets.UTF_8.toString());
-            geo = getJson("https://geocoding-api.open-meteo.com/v1/search?name=" + q + "&count=5&language=en&format=json");
-            results = geo.optJSONArray("results");
-        }
-
-        if (results == null || results.length() == 0) throw new Exception("place not found");
-        return results.getJSONObject(0);
-    }
-
     private JSONObject getJson(String address) throws Exception {
         HttpURLConnection c = (HttpURLConnection)new URL(address).openConnection();
         c.setConnectTimeout(7000);
         c.setReadTimeout(7000);
         c.setRequestProperty("Accept", "application/json");
-        c.setRequestProperty("User-Agent", "HiddenLauncher/0.3.1");
+        c.setRequestProperty("User-Agent", "HiddenLauncher/0.3.2");
 
         try {
             int code = c.getResponseCode();
@@ -1750,7 +1895,11 @@ public class MainActivity extends Activity {
 
         @NonNull
         @Override public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
-            if (type == TYPE_HOME) return new SimpleHolder(buildHomePanel());
+            if (type == TYPE_HOME) {
+                LinearLayout home = buildHomePanel();
+                home.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, availableHeight()));
+                return new SimpleHolder(home);
+            }
             if (type == TYPE_HEADER) return new SimpleHolder(buildDrawerHeader());
 
             if (type == TYPE_JOURNEY) {
@@ -1777,6 +1926,7 @@ public class MainActivity extends Activity {
             LinearLayout row = new LinearLayout(MainActivity.this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
             pad(row, 26, 0, 58, 0);
 
             TextView label = text("", 18, fg);
@@ -1785,7 +1935,7 @@ public class MainActivity extends Activity {
             label.setEllipsize(TextUtils.TruncateAt.END);
             label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             label.setIncludeFontPadding(false);
-            row.addView(label, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
+            row.addView(label, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             return new AppHolder(row, label);
         }
 
