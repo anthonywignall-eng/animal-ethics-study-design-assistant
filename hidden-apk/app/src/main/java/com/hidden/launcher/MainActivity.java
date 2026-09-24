@@ -838,23 +838,29 @@ public class MainActivity extends Activity {
 
         addSectionTitle(content, "HIDDEN");
         content.addView(actionRow("HIDDEN apps", selectedCount(hiddenSet()) + " hidden", v -> showAppPicker(false)));
-        content.addView(cycleRow("HIDDEN-area theme", hiddenThemeLabel(), v -> {
-            prefs.edit().putString("hidden_theme", nextHiddenTheme()).apply();
-            if (v instanceof LinearLayout) {
-                LinearLayout row = (LinearLayout)v;
-                if (row.getChildCount() > 1 && row.getChildAt(1) instanceof TextView) {
-                    ((TextView)row.getChildAt(1)).setText(hiddenThemeLabel());
-                }
-            }
-        }));
         content.addView(actionRow("Review notifications", "Android settings", v -> showNotificationReview()));
 
-        addSectionTitle(content, "APPEARANCE");
-        content.addView(cycleRow("Theme", themeLabel(), v -> {
+        addSectionTitle(content, "THEMES");
+        content.addView(cycleRow("HOME theme", themeLabelFor("home_theme"), v -> {
+            String next = nextThemeValue(themeFor("home_theme"));
+            prefs.edit().putString("home_theme", next).apply();
+            if (v instanceof LinearLayout && ((LinearLayout)v).getChildCount() > 1) {
+                ((TextView)((LinearLayout)v).getChildAt(1)).setText(themeLabel(next));
+            }
+        }));
+        content.addView(cycleRow("DRAWER theme", themeLabelFor("drawer_theme"), v -> {
             int y = scroll.getScrollY();
-            prefs.edit().putString("theme_mode", nextTheme()).apply();
+            String next = nextThemeValue(themeFor("drawer_theme"));
+            prefs.edit().putString("drawer_theme", next).putString("theme_mode", next).apply();
             applyPalette();
             showSettings(y);
+        }));
+        content.addView(cycleRow("HIDDEN theme", themeLabelFor("hidden_theme"), v -> {
+            String next = nextThemeValue(themeFor("hidden_theme"));
+            prefs.edit().putString("hidden_theme", next).apply();
+            if (v instanceof LinearLayout && ((LinearLayout)v).getChildCount() > 1) {
+                ((TextView)((LinearLayout)v).getChildAt(1)).setText(themeLabel(next));
+            }
         }));
         content.addView(actionRow("Seamless Home", "matching wallpaper", v -> openHiddenWallpaperPicker()));
 
@@ -870,7 +876,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.5", 12, muted);
+        TextView version = text("HIDDEN · v0.6", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
