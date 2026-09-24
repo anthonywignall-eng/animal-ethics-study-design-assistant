@@ -4,6 +4,7 @@ import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.role.RoleManager;
+import android.app.WallpaperManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -194,15 +195,25 @@ public class MainActivity extends Activity {
 
     private boolean useDarkPalette() {
         String mode = prefs.getString("theme_mode", "system");
-        if ("dark".equals(mode)) return true;
+        if ("dark".equals(mode) || "oled".equals(mode)) return true;
         if ("light".equals(mode)) return false;
         int night = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
         return night == Configuration.UI_MODE_NIGHT_YES;
     }
 
     private void applyPalette() {
+        String mode = prefs.getString("theme_mode", "system");
+        boolean oled = "oled".equals(mode);
         boolean dark = useDarkPalette();
-        if (dark) {
+
+        if (oled) {
+            bg = Color.BLACK;
+            fg = Color.rgb(248, 248, 245);
+            muted = Color.rgb(158, 158, 153);
+            panel = Color.rgb(13, 13, 13);
+            line = Color.rgb(38, 38, 38);
+            getWindow().getDecorView().setSystemUiVisibility(0);
+        } else if (dark) {
             bg = Color.rgb(18, 18, 18);
             fg = Color.rgb(239, 239, 236);
             muted = Color.rgb(158, 158, 151);
@@ -748,6 +759,7 @@ public class MainActivity extends Activity {
             applyPalette();
             showSettings(y);
         }));
+        content.addView(actionRow("Seamless Home", "matching wallpaper", v -> openHiddenWallpaperPicker()));
 
         addSectionTitle(content, "ABOUT HIDDEN");
         TextView privacy = text("No account. No analytics. No ads. No tracking. No location access. No notification access. Your settings stay on this phone.", 14, fg);
@@ -761,7 +773,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.4.2", 12, muted);
+        TextView version = text("HIDDEN · v0.4.3", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -1097,6 +1109,15 @@ public class MainActivity extends Activity {
             showOnboarding(2);
         }));
 
+        TextView seamlessNote = text("Want the Home gesture to look completely seamless? Use HIDDEN's matching wallpaper so Android has the same background to show during the transition.", 13, muted);
+        seamlessNote.setLineSpacing(0, 1.2f);
+        pad(seamlessNote, 0, 10, 0, 4);
+        content.addView(seamlessNote);
+
+        TextView seamlessAction = boldAction("Set matching HIDDEN wallpaper");
+        seamlessAction.setOnClickListener(v -> openHiddenWallpaperPicker());
+        content.addView(seamlessAction);
+
         content.addView(cycleRow("HIDDEN-area theme", hiddenThemeLabel(), v -> {
             prefs.edit().putString("hidden_theme", nextHiddenTheme()).apply();
             showOnboarding(2);
@@ -1235,6 +1256,7 @@ public class MainActivity extends Activity {
         String t = prefs.getString("theme_mode", "system");
         if ("light".equals(t)) return "LIGHT";
         if ("dark".equals(t)) return "DARK";
+        if ("oled".equals(t)) return "OLED";
         return "SYSTEM";
     }
 
@@ -1242,7 +1264,23 @@ public class MainActivity extends Activity {
         String t = prefs.getString("theme_mode", "system");
         if ("system".equals(t)) return "light";
         if ("light".equals(t)) return "dark";
+        if ("dark".equals(t)) return "oled";
         return "system";
+    }
+
+    private void openHiddenWallpaperPicker() {
+        try {
+            Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+            intent.putExtra(
+                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                new ComponentName(this, HiddenWallpaperService.class)
+            );
+            startActivity(intent);
+        } catch (Exception e) {
+            try {
+                startActivity(new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER));
+            } catch (Exception ignored) {}
+        }
     }
 
     private String hiddenThemeLabel() {
