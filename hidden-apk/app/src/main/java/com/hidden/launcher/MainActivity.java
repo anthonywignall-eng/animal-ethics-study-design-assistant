@@ -1186,7 +1186,7 @@ public class MainActivity extends Activity {
         defaultHomeStatusView = (TextView)homeRoleRow.getChildAt(1);
         content.addView(homeRoleRow);
 
-        TextView version = text("HIDDEN · v0.7.1", 12, muted);
+        TextView version = text("HIDDEN · v0.8", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
