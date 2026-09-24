@@ -319,7 +319,7 @@ public class MainActivity extends Activity {
             t.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
             t.setLetterSpacing(0.055f);
             t.getPaint().setAntiAlias(false);
-        } else if (isTheme("doom")) {
+        } else if (isDoomTheme()) {
             t.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
             t.setLetterSpacing(0.055f);
         } else {
@@ -658,7 +658,7 @@ public class MainActivity extends Activity {
             search.setTypeface(Typeface.MONOSPACE);
             search.setAllCaps(false);
             search.getPaint().setAntiAlias(false);
-        } else if (isTheme("doom")) {
+        } else if (isDoomTheme()) {
             search.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
             search.setLetterSpacing(0.04f);
         }
@@ -2050,6 +2050,45 @@ public class MainActivity extends Activity {
         }
     }
 
+    class ThemePreviewView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final String theme;
+        private final boolean selected;
+
+        ThemePreviewView(Context context, String theme, boolean selected) {
+            super(context);
+            this.theme = theme;
+            this.selected = selected;
+            setClickable(true);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            ThemeArt.draw(canvas, getWidth(), getHeight(), theme, getResources(), 8675309L);
+
+            String label = themeLabel(theme);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(dp(15));
+            paint.setTypeface("8bit".equals(theme)
+                ? Typeface.MONOSPACE
+                : Typeface.create("sans-serif", Typeface.BOLD));
+            paint.setAntiAlias(!"8bit".equals(theme));
+
+            int textColor = ThemeArt.foreground(theme, getResources());
+            paint.setColor(textColor);
+            canvas.drawText(label, getWidth() / 2f, getHeight() / 2f + dp(5), paint);
+
+            if (selected) {
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(dp(2));
+                paint.setColor(textColor);
+                canvas.drawRect(dp(1), dp(1), getWidth() - dp(1), getHeight() - dp(1), paint);
+                paint.setStyle(Paint.Style.FILL);
+            }
+        }
+    }
+
     class AlphabetRailView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final String letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -2081,7 +2120,7 @@ public class MainActivity extends Activity {
 
             float step = getHeight() / (float)letters.length();
             for (int i = 0; i < letters.length(); i++) {
-                paint.setColor(isTheme("doom") ? doomColors[i % doomColors.length] : muted);
+                paint.setColor(isDoomTheme() ? doomColors[i % doomColors.length] : muted);
                 float y = step * i + step * 0.7f;
                 canvas.drawText(String.valueOf(letters.charAt(i)), getWidth() - dp(13), y, paint);
             }
@@ -2367,7 +2406,7 @@ public class MainActivity extends Activity {
                 if (isTheme("8bit")) {
                     h.label.setText("> " + app.label.toUpperCase(Locale.ROOT));
                     applyRegularTypeface(h.label);
-                } else if (isTheme("doom")) {
+                } else if (isDoomTheme()) {
                     h.label.setText(globalStyledText(app.label.toUpperCase(Locale.ROOT)));
                     applyStrongTypeface(h.label);
                 } else {
@@ -2394,10 +2433,12 @@ public class MainActivity extends Activity {
                 HiddenPalette hp = hiddenPalette();
                 block.setBackgroundColor(hp.background);
 
-                TextView title = hiddenHeading("doom".equals(prefs.getString("hidden_theme", "dark")) ? "DOOM SCROLL" : "HIDDEN", 36, hp.foreground);
+                String hiddenTheme = themeFor("hidden_theme");
+                boolean hiddenDoom = "doom_light".equals(hiddenTheme) || "doom_dark".equals(hiddenTheme);
+                TextView title = hiddenHeading(hiddenDoom ? "DOOM SCROLL" : "HIDDEN", 36, hp.foreground);
                 block.addView(title);
 
-                if ("doom".equals(prefs.getString("hidden_theme", "dark"))) {
+                if (hiddenDoom) {
                     TextView fine = text("fine.", 13, hp.muted);
                     pad(fine, 0, 2, 0, 8);
                     block.addView(fine);
@@ -2483,13 +2524,13 @@ public class MainActivity extends Activity {
             h.root.setBackgroundColor(hp.background);
             h.label.setTextColor(hp.foreground);
 
-            String theme = prefs.getString("hidden_theme", "dark");
+            String theme = themeFor("hidden_theme");
             if ("8bit".equals(theme)) {
                 h.label.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
                 h.label.getPaint().setAntiAlias(false);
                 h.label.setLetterSpacing(0.055f);
                 h.label.setText("> " + app.label.toUpperCase(Locale.ROOT) + " _");
-            } else if ("doom".equals(theme)) {
+            } else if ("doom_light".equals(theme) || "doom_dark".equals(theme)) {
                 h.label.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
                 h.label.setText(earthyDoomText(app.label.toUpperCase(Locale.ROOT)));
             } else {
@@ -2556,11 +2597,11 @@ public class MainActivity extends Activity {
     }
 
     private HiddenPalette hiddenPalette() {
-        String theme = prefs.getString("hidden_theme", "dark");
-        if ("light".equals(theme)) return new HiddenPalette(Color.rgb(242, 240, 234), Color.rgb(22, 22, 20), Color.rgb(112, 112, 106));
-        if ("grayscale".equals(theme)) return new HiddenPalette(Color.rgb(184, 184, 184), Color.rgb(35, 35, 35), Color.rgb(86, 86, 86));
-        if ("8bit".equals(theme)) return new HiddenPalette(Color.rgb(10, 14, 28), Color.rgb(244, 232, 180), Color.rgb(154, 166, 124));
-        if ("doom".equals(theme)) return new HiddenPalette(Color.rgb(10, 8, 8), Color.rgb(218, 176, 159), Color.rgb(143, 115, 105));
-        return new HiddenPalette(Color.rgb(8, 9, 12), Color.rgb(241, 241, 238), Color.rgb(136, 138, 145));
+        String theme = themeFor("hidden_theme");
+        return new HiddenPalette(
+            ThemeArt.background(theme, getResources()),
+            ThemeArt.foreground(theme, getResources()),
+            ThemeArt.muted(theme, getResources())
+        );
     }
 }
