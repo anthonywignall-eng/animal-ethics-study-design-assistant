@@ -16,6 +16,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -1639,7 +1640,9 @@ public class MainActivity extends Activity {
 
             if (reveal > 0f) {
                 int save = c.save();
-                c.clipRoundRect(screen, dp(22), dp(22));
+                Path clip = new Path();
+                clip.addRoundRect(screen, dp(22), dp(22), Path.Direction.CW);
+                c.clipPath(clip);
 
                 float sh = screen.height();
                 float worldH = sh * 6.5f;
@@ -1727,7 +1730,8 @@ public class MainActivity extends Activity {
                 float sy = screen.top + wy - scrollY;
                 if (sy < screen.top || sy > screen.bottom) continue;
 
-                float radius = dp(0.7f) + random.nextFloat() * dp(1.0f);
+                float density = getResources().getDisplayMetrics().density;
+                float radius = density * (0.7f + random.nextFloat());
                 int alpha = 120 + random.nextInt(136);
                 p.setColor(Color.argb(alpha, 246, 246, 242));
                 c.drawCircle(sx, sy, radius, p);
