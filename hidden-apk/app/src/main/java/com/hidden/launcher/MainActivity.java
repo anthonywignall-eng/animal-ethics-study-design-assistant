@@ -23,6 +23,7 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -533,7 +534,7 @@ public class MainActivity extends Activity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(bg);
+        root.setBackground(new ThemePatternDrawable(renderThemeOverride, 4815162342L));
         root.setMinimumHeight(availableHeight());
         pad(root, 28, 42, 28, 20);
 
@@ -1728,6 +1729,29 @@ public class MainActivity extends Activity {
             b.append(parts.get(i));
         }
         return b.toString();
+    }
+
+    class ThemePatternDrawable extends Drawable {
+        private final String theme;
+        private final long seed;
+
+        ThemePatternDrawable(String theme, long seed) {
+            this.theme = theme;
+            this.seed = seed;
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            Rect bounds = getBounds();
+            canvas.save();
+            canvas.translate(bounds.left, bounds.top);
+            ThemeArt.draw(canvas, bounds.width(), bounds.height(), theme, getResources(), seed);
+            canvas.restore();
+        }
+
+        @Override public void setAlpha(int alpha) {}
+        @Override public void setColorFilter(android.graphics.ColorFilter colorFilter) {}
+        @Override public int getOpacity() { return android.graphics.PixelFormat.OPAQUE; }
     }
 
     class ChevronView extends View {
