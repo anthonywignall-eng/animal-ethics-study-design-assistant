@@ -769,10 +769,17 @@ public class MainActivity extends Activity {
         return home != null && home.getTop() >= -dp(6);
     }
 
+    private AlertDialog.Builder dialogBuilder() {
+        int dialogTheme = useDarkPalette()
+            ? android.R.style.Theme_Material_Dialog_Alert
+            : android.R.style.Theme_Material_Light_Dialog_Alert;
+        return new AlertDialog.Builder(this, dialogTheme);
+    }
+
     private void openNotificationShadeFromHome() {
         if (HiddenAccessibilityService.openNotifications()) return;
 
-        new AlertDialog.Builder(this)
+        dialogBuilder()
             .setTitle("Enable swipe-down notifications")
             .setMessage("Android only allows a third-party launcher to open the notification shade through Accessibility. HIDDEN's service does not read screen content or notifications; it only performs this one system action when you swipe down on Home.")
             .setNegativeButton("Not now", null)
@@ -971,6 +978,13 @@ public class MainActivity extends Activity {
         search.setTextSize(15);
         search.setTextColor(fg);
         search.setHintTextColor(muted);
+        search.setHighlightColor(Color.argb(70, Color.red(fg), Color.green(fg), Color.blue(fg)));
+        Drawable cursor = search.getTextCursorDrawable();
+        if (cursor != null) {
+            cursor = cursor.mutate();
+            cursor.setTint(fg);
+            search.setTextCursorDrawable(cursor);
+        }
         search.setBackgroundColor(panel);
         if (isTheme("8bit")) {
             search.setTypeface(Typeface.MONOSPACE);
@@ -2431,6 +2445,7 @@ public class MainActivity extends Activity {
         private static final int TYPE_HIDDEN_HEADER = 5;
         private static final int TYPE_HIDDEN_APP = 6;
         private static final int TYPE_REWIND = 7;
+        private static final int TYPE_EMPTY = 8;
 
         private final List<Object> items = new ArrayList<>();
         private final Map<Character,Integer> letterPositions = new HashMap<>();
@@ -2452,6 +2467,7 @@ public class MainActivity extends Activity {
             if ("JOURNEY".equals(item)) return -1003;
             if ("HIDDEN_HEADER".equals(item)) return -1004;
             if ("REWIND".equals(item)) return -1005;
+            if ("EMPTY".equals(item)) return -1006;
             if (item instanceof AppItem) return ((AppItem)item).pkg.hashCode();
             if (item instanceof HiddenApp) return -2000000000L + ((HiddenApp)item).app.pkg.hashCode();
             return position;
@@ -2529,6 +2545,7 @@ public class MainActivity extends Activity {
             }
 
             Set<String> hidden = hiddenSet();
+            int matchCount = 0;
 
             for (AppItem app : apps) {
                 if (hidden.contains(app.pkg)) continue;
@@ -2536,6 +2553,7 @@ public class MainActivity extends Activity {
 
                 int position = items.size();
                 items.add(app);
+                matchCount++;
 
                 if (!app.label.isEmpty()) {
                     char c = Character.toUpperCase(app.label.charAt(0));
@@ -2543,7 +2561,11 @@ public class MainActivity extends Activity {
                 }
             }
 
-            if (isSearchMode() || hidden.isEmpty()) return;
+            if (isSearchMode()) {
+                if (!q.isEmpty() && matchCount == 0) items.add("EMPTY");
+                return;
+            }
+            if (hidden.isEmpty()) return;
 
             if (!doomPaused()) {
                 journeyPos = items.size();
@@ -2567,6 +2589,7 @@ public class MainActivity extends Activity {
             if ("JOURNEY".equals(item)) return TYPE_JOURNEY;
             if ("HIDDEN_HEADER".equals(item)) return TYPE_HIDDEN_HEADER;
             if ("REWIND".equals(item)) return TYPE_REWIND;
+            if ("EMPTY".equals(item)) return TYPE_EMPTY;
             if (item instanceof HiddenApp) return TYPE_HIDDEN_APP;
             return TYPE_APP;
         }
@@ -2596,6 +2619,16 @@ public class MainActivity extends Activity {
                 ));
                 pad(block, 26, 24, 26, 16);
                 return new SimpleHolder(block);
+            }
+
+            if (type == TYPE_EMPTY) {
+                TextView empty = text("No apps found", 16, muted);
+                empty.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
+                empty.setLayoutParams(new RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(72)
+                ));
+                return new SimpleHolder(empty);
             }
 
             if (type == TYPE_REWIND) {
@@ -2729,9 +2762,12 @@ public class MainActivity extends Activity {
                 t.getPaint().setAntiAlias(false);
                 t.setLetterSpacing(0.055f);
             } else if ("doom_light".equals(theme) || "doom_dark".equals(theme)) {
-                t.setText(earthyDoomText(value));
+                t.setText(strong ? earthyDoomText(value) : value);
                 t.setTypeface(Typeface.create("sans-serif-condensed", strong ? Typeface.BOLD : Typeface.NORMAL));
                 t.setLetterSpacing(strong ? 0.055f : 0.035f);
+                if (strong) {
+                    t.setShadowLayer(1.6f, 0f, 1f, "doom_light".equals(theme) ? Color.argb(120,255,250,238) : Color.argb(220,0,0,0));
+                }
             } else {
                 t.setText(value);
                 t.setTypeface(Typeface.create("sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
@@ -2755,7 +2791,7 @@ public class MainActivity extends Activity {
         }
 
         private void confirmHide(AppItem app) {
-            new AlertDialog.Builder(MainActivity.this)
+            dialogBuilder()
                 .setTitle("Hide " + app.label + "?")
                 .setMessage("It will disappear from the normal list and search.")
                 .setNegativeButton("Cancel", null)
@@ -2774,7 +2810,7 @@ public class MainActivity extends Activity {
         }
 
         private void confirmRestore(AppItem app) {
-            new AlertDialog.Builder(MainActivity.this)
+            dialogBuilder()
                 .setTitle("Bring " + app.label + " back?")
                 .setMessage("It will return to the normal app list.")
                 .setNegativeButton("Cancel", null)
