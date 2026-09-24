@@ -5,6 +5,7 @@ import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 
 import java.util.Random;
@@ -26,6 +27,8 @@ public final class ThemeArt {
             case "doom_light": return Color.rgb(245, 239, 226);
             case "doom_dark": return Color.rgb(5, 6, 6);
             case "8bit": return Color.rgb(10, 14, 28);
+            case "soft_launch": return Color.rgb(247, 239, 235);
+            case "moth": return Color.rgb(25, 23, 31);
             default: return Color.rgb(241, 239, 232);
         }
     }
@@ -40,6 +43,10 @@ public final class ThemeArt {
                 return Color.rgb(244, 232, 180);
             case "doom_dark":
                 return Color.rgb(235, 218, 195);
+            case "soft_launch":
+                return Color.rgb(58, 43, 49);
+            case "moth":
+                return Color.rgb(241, 232, 216);
             default:
                 return Color.rgb(242, 242, 238);
         }
@@ -55,6 +62,10 @@ public final class ThemeArt {
                 return Color.rgb(154, 166, 124);
             case "doom_dark":
                 return Color.rgb(155, 145, 128);
+            case "soft_launch":
+                return Color.rgb(133, 106, 116);
+            case "moth":
+                return Color.rgb(176, 164, 150);
             default:
                 return Color.rgb(155, 155, 149);
         }
@@ -69,6 +80,8 @@ public final class ThemeArt {
             case "oled": return Color.rgb(13, 13, 13);
             case "doom_dark": return Color.rgb(19, 17, 15);
             case "8bit": return Color.rgb(20, 27, 45);
+            case "soft_launch": return Color.rgb(237, 219, 221);
+            case "moth": return Color.rgb(39, 35, 47);
             default: return Color.rgb(31, 31, 31);
         }
     }
@@ -82,6 +95,8 @@ public final class ThemeArt {
             case "oled": return Color.rgb(38, 38, 38);
             case "doom_dark": return Color.rgb(62, 53, 44);
             case "8bit": return Color.rgb(83, 96, 67);
+            case "soft_launch": return Color.rgb(218, 194, 200);
+            case "moth": return Color.rgb(75, 65, 78);
             default: return Color.rgb(55, 55, 55);
         }
     }
@@ -96,6 +111,10 @@ public final class ThemeArt {
             drawPaint(canvas, width, height, seed, true);
         } else if ("8bit".equals(theme)) {
             drawPixels(canvas, width, height, seed);
+        } else if ("soft_launch".equals(theme)) {
+            drawSoftBotanical(canvas, width, height, seed);
+        } else if ("moth".equals(theme)) {
+            drawMothPaper(canvas, width, height, seed);
         }
     }
 
