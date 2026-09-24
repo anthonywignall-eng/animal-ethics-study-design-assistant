@@ -444,7 +444,8 @@ public class MainActivity extends Activity {
                 int hiddenStart = launcherAdapter.hiddenHeaderPosition();
 
                 boolean beforeDoom = journey < 0 || last < journey;
-                boolean showRail = launcherAdapter.query.isEmpty()
+                boolean showRail = !launcherAdapter.isSearchMode()
+                    && launcherAdapter.query.isEmpty()
                     && first >= launcherAdapter.firstAppPosition()
                     && beforeDoom;
 
@@ -694,6 +695,15 @@ public class MainActivity extends Activity {
         search.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) {
                 enterDrawerSearch();
+
+                if (inFlow && stickyDrawerSearch != null && stickyDrawerSearch != search) {
+                    handler.post(() -> {
+                        if (stickyDrawerSearch != null) {
+                            stickyDrawerSearch.requestFocus();
+                            stickyDrawerSearch.setSelection(stickyDrawerSearch.length());
+                        }
+                    });
+                }
             } else {
                 handler.postDelayed(this::maybeExitDrawerSearch, 140);
             }
