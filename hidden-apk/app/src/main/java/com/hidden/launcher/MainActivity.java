@@ -931,6 +931,12 @@ public class MainActivity extends Activity {
         } else if (isDoomTheme()) {
             search.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
             search.setLetterSpacing(0.04f);
+        } else if (isTheme("soft_launch")) {
+            search.setTypeface(Typeface.create("sans-serif-rounded", Typeface.NORMAL));
+            search.setLetterSpacing(0.01f);
+        } else if (isTheme("moth")) {
+            search.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+            search.setLetterSpacing(0.015f);
         }
         pad(search, 14, 8, 14, 8);
         search.setText(launcherAdapter == null ? "" : launcherAdapter.query);
@@ -2919,6 +2925,14 @@ public class MainActivity extends Activity {
                 if (strong) {
                     t.setShadowLayer(1.6f, 0f, 1f, "doom_light".equals(theme) ? Color.argb(120,255,250,238) : Color.argb(220,0,0,0));
                 }
+            } else if ("soft_launch".equals(theme)) {
+                t.setText(value);
+                t.setTypeface(Typeface.create("sans-serif-rounded", strong ? Typeface.BOLD : Typeface.NORMAL));
+                t.setLetterSpacing(strong ? 0.018f : 0.01f);
+            } else if ("moth".equals(theme)) {
+                t.setText(value);
+                t.setTypeface(Typeface.create(strong ? "serif" : "sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
+                t.setLetterSpacing(strong ? 0.018f : 0.01f);
             } else {
                 t.setText(value);
                 t.setTypeface(Typeface.create("sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
@@ -2936,6 +2950,10 @@ public class MainActivity extends Activity {
             } else if ("doom_light".equals(theme) || "doom_dark".equals(theme)) {
                 t.setText(earthyDoomText(value));
                 t.setTypeface(Typeface.create("sans-serif-condensed", strong ? Typeface.BOLD : Typeface.NORMAL));
+            } else if ("soft_launch".equals(theme)) {
+                t.setTypeface(Typeface.create("sans-serif-rounded", strong ? Typeface.BOLD : Typeface.NORMAL));
+            } else if ("moth".equals(theme)) {
+                t.setTypeface(Typeface.create(strong ? "serif" : "sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
             } else {
                 t.setTypeface(Typeface.create("sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
             }
@@ -2990,6 +3008,14 @@ public class MainActivity extends Activity {
                 h.label.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
                 h.label.setText(earthyDoomText(app.label.toUpperCase(Locale.ROOT)));
                 h.label.setShadowLayer(1.6f, 0f, 1f, "doom_light".equals(theme) ? Color.argb(120,255,250,238) : Color.argb(220,0,0,0));
+            } else if ("soft_launch".equals(theme)) {
+                h.label.setTypeface(Typeface.create("sans-serif-rounded", Typeface.NORMAL));
+                h.label.setLetterSpacing(0.012f);
+                h.label.setText(app.label);
+            } else if ("moth".equals(theme)) {
+                h.label.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+                h.label.setLetterSpacing(0.012f);
+                h.label.setText(app.label);
             } else {
                 h.label.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
                 h.label.setText(app.label);
