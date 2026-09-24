@@ -62,6 +62,9 @@ public class HiddenWallpaperService extends WallpaperService {
             if ("oled".equals(mode)) return Color.BLACK;
             if ("dark".equals(mode)) return Color.rgb(18, 18, 18);
             if ("light".equals(mode)) return Color.rgb(241, 239, 232);
+            if ("grayscale".equals(mode)) return Color.rgb(24, 24, 24);
+            if ("8bit".equals(mode)) return Color.rgb(10, 14, 28);
+            if ("doom".equals(mode)) return Color.rgb(13, 10, 9);
 
             int night = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
             if (night == Configuration.UI_MODE_NIGHT_YES) {
