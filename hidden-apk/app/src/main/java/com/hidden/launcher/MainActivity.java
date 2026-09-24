@@ -1128,6 +1128,7 @@ public class MainActivity extends Activity {
         defaultHomeStatusView = null;
         favouriteCountView = null;
         hiddenCountView = null;
+        wallpaperStatusView = null;
         applyPalette();
 
         ScrollView scroll = new ScrollView(this);
@@ -1185,7 +1186,23 @@ public class MainActivity extends Activity {
 
         addSectionTitle(content, "APPEARANCE");
         content.addView(actionRow("Theme", themeLabel(currentTheme()), v -> showThemePickerScreen()));
-        content.addView(actionRow("Seamless Home", "matching wallpaper", v -> openHiddenWallpaperPicker()));
+
+        LinearLayout appearanceRow = (LinearLayout)actionRow("App appearance", appAppearanceLabel(), null);
+        TextView appearanceValue = (TextView)appearanceRow.getChildAt(1);
+        appearanceRow.setOnClickListener(v -> {
+            String next = iconsAndText() ? "text" : "icons_text";
+            prefs.edit().putString("app_appearance", next).apply();
+            appearanceValue.setText(appAppearanceLabel());
+        });
+        content.addView(appearanceRow);
+
+        LinearLayout seamlessRow = (LinearLayout)actionRow(
+            "Seamless Home",
+            isHiddenWallpaperActive() ? "ACTIVE ✓" : "SET WALLPAPER",
+            v -> openHiddenWallpaperPicker()
+        );
+        wallpaperStatusView = (TextView)seamlessRow.getChildAt(1);
+        content.addView(seamlessRow);
 
         addSectionTitle(content, "ABOUT HIDDEN");
         TextView privacy = text("No account. No analytics. No ads. No tracking. No location access. No notification access. Your settings stay on this phone.", 14, fg);
@@ -1201,7 +1218,7 @@ public class MainActivity extends Activity {
         defaultHomeStatusView = (TextView)homeRoleRow.getChildAt(1);
         content.addView(homeRoleRow);
 
-        TextView version = text("HIDDEN · v0.7.3", 12, muted);
+        TextView version = text("HIDDEN · v0.8", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -1391,7 +1408,9 @@ public class MainActivity extends Activity {
         if (page == 0) onboardingOne(outer);
         else if (page == 1) onboardingTwo(outer);
         else if (page == 2) onboardingTheme(outer);
-        else if (page == 3) onboardingDoom(outer);
+        else if (page == 3) onboardingAppearance(outer);
+        else if (page == 4) onboardingWallpaper(outer);
+        else if (page == 5) onboardingDoom(outer);
         else onboardingFinish(outer);
 
         View stretch = new View(this);
@@ -1399,15 +1418,15 @@ public class MainActivity extends Activity {
 
         LinearLayout footer = new LinearLayout(this);
         footer.setGravity(Gravity.CENTER_VERTICAL);
-        TextView count = text("PAGE " + (page + 1) + " / 5", 12, muted);
-        TextView next = heading(page == 4 ? "Use HIDDEN" : "Next  →", 18);
+        TextView count = text("PAGE " + (page + 1) + " / 7", 12, muted);
+        TextView next = heading(page == 6 ? "Use HIDDEN" : "Next  →", 18);
         next.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         footer.addView(count, new LinearLayout.LayoutParams(0, dp(56), 1f));
         footer.addView(next, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(56)));
         outer.addView(footer);
 
         next.setOnClickListener(v -> {
-            if (page < 4) showOnboarding(page + 1);
+            if (page < 6) showOnboarding(page + 1);
             else {
                 prefs.edit().putInt("onboarding_version", ONBOARDING_VERSION).apply();
                 if (!isDefaultHome()) requestHomeRole();
@@ -1533,14 +1552,65 @@ public class MainActivity extends Activity {
             content.addView(preview, pp);
         }
 
-        addSectionTitle(content, "SEAMLESS HOME");
-        TextView seamless = text("Use HIDDEN's matching wallpaper so Android has the same surface to show during the Home transition.", 13, muted);
-        seamless.setLineSpacing(0, 1.2f);
-        content.addView(seamless);
+    }
 
-        TextView wallpaper = boldAction("Set matching HIDDEN wallpaper");
-        wallpaper.setOnClickListener(v -> openHiddenWallpaperPicker());
-        content.addView(wallpaper);
+    private void onboardingAppearance(LinearLayout content) {
+        TextView title = heading("How should your apps look?", 34);
+        pad(title, 0, 14, 0, 8);
+        content.addView(title);
+
+        TextView copy = text("This applies across every theme. Keep HIDDEN purely typographic, or add the real app icon beside each name.", 15, muted);
+        copy.setLineSpacing(0, 1.22f);
+        content.addView(copy);
+
+        String selected = prefs.getString("app_appearance", "text");
+
+        TextView textOnly = pickerCard(
+            "TEXT ONLY" + ("text".equals(selected) ? "  ✓" : ""),
+            "Calculator   Calendar   Camera"
+        );
+        textOnly.setOnClickListener(v -> {
+            prefs.edit().putString("app_appearance", "text").apply();
+            showOnboarding(3);
+        });
+        content.addView(textOnly);
+
+        TextView iconsText = pickerCard(
+            "ICONS + TEXT" + ("icons_text".equals(selected) ? "  ✓" : ""),
+            "◉  Calculator    ◉  Calendar    ◉  Camera"
+        );
+        iconsText.setOnClickListener(v -> {
+            prefs.edit().putString("app_appearance", "icons_text").apply();
+            showOnboarding(3);
+        });
+        content.addView(iconsText);
+    }
+
+    private void onboardingWallpaper(LinearLayout content) {
+        TextView title = heading("Make Home seamless.", 34);
+        pad(title, 0, 14, 0, 8);
+        content.addView(title);
+
+        TextView copy = text("Set HIDDEN's matching live wallpaper so Android shows the same surface during Home transitions. Android will open its own wallpaper confirmation screen.", 15, muted);
+        copy.setLineSpacing(0, 1.22f);
+        content.addView(copy);
+
+        addSectionTitle(content, "MATCHING WALLPAPER");
+
+        TextView status = heading(isHiddenWallpaperActive() ? "ACTIVE ✓" : "NOT SET", 22);
+        wallpaperStatusView = status;
+        pad(status, 0, 4, 0, 12);
+        content.addView(status);
+
+        TextView action = boldAction(isHiddenWallpaperActive() ? "Open wallpaper settings" : "SET MATCHING WALLPAPER");
+        action.setBackgroundColor(panel);
+        pad(action, 16, 16, 16, 16);
+        action.setOnClickListener(v -> openHiddenWallpaperPicker());
+        content.addView(action);
+
+        TextView note = text("You can change or remove it later from HIDDEN Settings.", 13, muted);
+        pad(note, 0, 12, 0, 0);
+        content.addView(note);
     }
 
     private void onboardingDoom(LinearLayout content) {
@@ -1749,16 +1819,30 @@ public class MainActivity extends Activity {
             content.addView(preview, pp);
         }
 
-        TextView wallpaper = boldAction("Set matching HIDDEN wallpaper");
-        pad(wallpaper, 0, 18, 0, 12);
-        wallpaper.setOnClickListener(v -> openHiddenWallpaperPicker());
-        content.addView(wallpaper);
-
         TextView back = boldAction("‹ Settings");
         back.setOnClickListener(v -> showSettings());
         content.addView(back);
 
         setContentView(scroll);
+    }
+
+    private boolean iconsAndText() {
+        return "icons_text".equals(prefs.getString("app_appearance", "text"));
+    }
+
+    private String appAppearanceLabel() {
+        return iconsAndText() ? "ICONS + TEXT" : "TEXT ONLY";
+    }
+
+    private boolean isHiddenWallpaperActive() {
+        try {
+            WallpaperInfo info = WallpaperManager.getInstance(this).getWallpaperInfo();
+            return info != null &&
+                getPackageName().equals(info.getPackageName()) &&
+                HiddenWallpaperService.class.getName().equals(info.getServiceName());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private void openHiddenWallpaperPicker() {
