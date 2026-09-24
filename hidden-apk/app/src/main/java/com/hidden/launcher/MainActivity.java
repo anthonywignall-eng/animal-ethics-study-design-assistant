@@ -83,7 +83,7 @@ public class MainActivity extends Activity {
     private static final String MODE_OFF = "off";
     private static final long HALF_HOUR = 30L * 60L * 1000L;
     private static final long REPEAT_WINDOW = 2L * 60L * 1000L;
-    private static final int ONBOARDING_VERSION = 4;
+    private static final int ONBOARDING_VERSION = 6;
 
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -107,6 +107,8 @@ public class MainActivity extends Activity {
     private EditText stickyDrawerSearch;
     private EditText flowDrawerSearch;
     private boolean syncingDrawerSearch = false;
+    private String renderThemeOverride = null;
+    private String onboardingThemeTarget = "home_theme";
 
     private enum Screen { HOME, SETTINGS, ONBOARDING, PICKER, NOTIFICATION_REVIEW, INTRO }
 
@@ -183,80 +185,79 @@ public class MainActivity extends Activity {
     }
 
     private void ensureDefaults() {
+        String legacy = prefs.getString("theme_mode", "system");
+        legacy = normaliseTheme(legacy);
+
         SharedPreferences.Editor e = prefs.edit();
         if (!prefs.contains("clock_mode")) e.putString("clock_mode", MODE_HOME);
         if (!prefs.contains("battery_mode")) e.putString("battery_mode", MODE_HOME);
         if (!prefs.contains("show_swipe_hint")) e.putBoolean("show_swipe_hint", true);
-        if (!prefs.contains("theme_mode")) e.putString("theme_mode", "system");
-        if (!prefs.contains("hidden_theme")) e.putString("hidden_theme", "dark");
+        if (!prefs.contains("home_theme")) e.putString("home_theme", legacy);
+        if (!prefs.contains("drawer_theme")) e.putString("drawer_theme", legacy);
+        if (!prefs.contains("hidden_theme")) e.putString("hidden_theme", legacy);
+        if (!prefs.contains("theme_mode")) e.putString("theme_mode", legacy);
         if (!prefs.contains("doom_screens")) e.putInt("doom_screens", 18);
         e.apply();
     }
 
+    private String normaliseTheme(String raw) {
+        if (raw == null) return "dark";
+        if ("doom".equals(raw)) return "doom_dark";
+        if ("grayscale".equals(raw)) return "dark";
+        if ("system".equals(raw)) return ThemeArt.resolve("system", getResources());
+        if ("light".equals(raw) || "dark".equals(raw) || "oled".equals(raw) ||
+            "doom_light".equals(raw) || "doom_dark".equals(raw) || "8bit".equals(raw)) {
+            return raw;
+        }
+        return "dark";
+    }
+
+    private String themeFor(String key) {
+        return normaliseTheme(prefs.getString(key, prefs.getString("theme_mode", "dark")));
+    }
+
+    private String currentTheme() {
+        return renderThemeOverride != null ? renderThemeOverride : themeFor("drawer_theme");
+    }
+
     private boolean isTheme(String name) {
-        return name.equals(prefs.getString("theme_mode", "system"));
+        return name.equals(currentTheme());
+    }
+
+    private boolean isDoomTheme() {
+        return "doom_light".equals(currentTheme()) || "doom_dark".equals(currentTheme());
     }
 
     private boolean useDarkPalette() {
-        String mode = prefs.getString("theme_mode", "system");
-        if ("dark".equals(mode) || "oled".equals(mode) || "grayscale".equals(mode) ||
-            "8bit".equals(mode) || "doom".equals(mode)) return true;
-        if ("light".equals(mode)) return false;
-        int night = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-        return night == Configuration.UI_MODE_NIGHT_YES;
+        String mode = currentTheme();
+        return "dark".equals(mode) || "oled".equals(mode) ||
+            "doom_dark".equals(mode) || "8bit".equals(mode);
+    }
+
+    private void setPaletteValues(String rawTheme) {
+        String mode = normaliseTheme(rawTheme);
+        bg = ThemeArt.background(mode, getResources());
+        fg = ThemeArt.foreground(mode, getResources());
+        muted = ThemeArt.muted(mode, getResources());
+        panel = ThemeArt.panel(mode, getResources());
+        line = ThemeArt.line(mode, getResources());
     }
 
     private void applyPalette() {
-        String mode = prefs.getString("theme_mode", "system");
-        boolean dark = useDarkPalette();
+        String mode = themeFor("drawer_theme");
+        renderThemeOverride = mode;
+        setPaletteValues(mode);
 
-        if ("oled".equals(mode)) {
-            bg = Color.BLACK;
-            fg = Color.rgb(248, 248, 245);
-            muted = Color.rgb(158, 158, 153);
-            panel = Color.rgb(13, 13, 13);
-            line = Color.rgb(38, 38, 38);
-            getWindow().getDecorView().setSystemUiVisibility(0);
-        } else if ("grayscale".equals(mode)) {
-            bg = Color.rgb(24, 24, 24);
-            fg = Color.rgb(228, 228, 224);
-            muted = Color.rgb(142, 142, 138);
-            panel = Color.rgb(38, 38, 38);
-            line = Color.rgb(70, 70, 70);
-            getWindow().getDecorView().setSystemUiVisibility(0);
-        } else if ("8bit".equals(mode)) {
-            bg = Color.rgb(10, 14, 28);
-            fg = Color.rgb(244, 232, 180);
-            muted = Color.rgb(154, 166, 124);
-            panel = Color.rgb(20, 27, 45);
-            line = Color.rgb(83, 96, 67);
-            getWindow().getDecorView().setSystemUiVisibility(0);
-        } else if ("doom".equals(mode)) {
-            bg = Color.rgb(13, 10, 9);
-            fg = Color.rgb(220, 178, 159);
-            muted = Color.rgb(151, 164, 140);
-            panel = Color.rgb(27, 21, 19);
-            line = Color.rgb(91, 67, 59);
-            getWindow().getDecorView().setSystemUiVisibility(0);
-        } else if (dark) {
-            bg = Color.rgb(18, 18, 18);
-            fg = Color.rgb(239, 239, 236);
-            muted = Color.rgb(158, 158, 151);
-            panel = Color.rgb(31, 31, 31);
-            line = Color.rgb(55, 55, 55);
-            getWindow().getDecorView().setSystemUiVisibility(0);
-        } else {
-            bg = Color.rgb(241, 239, 232);
-            fg = Color.rgb(21, 21, 19);
-            muted = Color.rgb(113, 110, 103);
-            panel = Color.rgb(227, 224, 215);
-            line = Color.rgb(213, 209, 199);
-            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        }
+        boolean lightBars = "light".equals(mode) || "doom_light".equals(mode);
+        getWindow().getDecorView().setSystemUiVisibility(
+            lightBars ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : 0
+        );
         getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
         getWindow().setBackgroundDrawable(new ColorDrawable(bg));
         getWindow().getDecorView().setBackgroundColor(bg);
+
+        renderThemeOverride = null;
     }
 
     private int dp(int value) {
@@ -276,7 +277,7 @@ public class MainActivity extends Activity {
     }
 
     private CharSequence globalStyledText(String value) {
-        if (!isTheme("doom")) return value;
+        if (!isDoomTheme()) return value;
 
         int[] colors = {
             Color.rgb(205, 146, 129),
@@ -305,7 +306,7 @@ public class MainActivity extends Activity {
             t.setTypeface(Typeface.MONOSPACE, Typeface.NORMAL);
             t.setLetterSpacing(0.045f);
             t.getPaint().setAntiAlias(false);
-        } else if (isTheme("doom")) {
+        } else if (isDoomTheme()) {
             t.setTypeface(Typeface.create("sans-serif-condensed", Typeface.NORMAL));
             t.setLetterSpacing(0.035f);
         } else {
@@ -330,7 +331,7 @@ public class MainActivity extends Activity {
         TextView t = new TextView(this);
         t.setText(globalStyledText(value));
         t.setTextSize(sp);
-        t.setTextColor(isTheme("doom") ? fg : color);
+        t.setTextColor(isDoomTheme() ? fg : color);
         t.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         t.setFontFeatureSettings("kern");
         applyRegularTypeface(t);
