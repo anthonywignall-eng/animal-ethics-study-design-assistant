@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.role.RoleManager;
 import android.app.WallpaperManager;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -26,6 +27,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.BatteryManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -36,13 +38,13 @@ import android.text.SpannableString;
 import android.text.TextWatcher;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
+import android.text.format.DateFormat;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
-import android.view.ViewParent;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -111,6 +113,22 @@ public class MainActivity extends Activity {
     private final List<TextView> drawerBatteryViews = new ArrayList<>();
     private TextView accessibilityStatusView;
     private TextView defaultHomeStatusView;
+    private TextView favouriteCountView;
+    private TextView hiddenCountView;
+    private boolean batteryReceiverRegistered = false;
+    private boolean packageReceiverRegistered = false;
+
+    private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            updateLiveUtilities();
+        }
+    };
+
+    private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            reloadAppsAndSelections();
+        }
+    };
 
     private final Runnable uiTicker = new Runnable() {
         @Override public void run() {
@@ -143,8 +161,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        apps = loadApps();
         ensureDefaults();
+        apps = loadApps();
+        pruneSelectionSets();
         applyPalette();
 
         if (prefs.getInt("onboarding_version", 0) < ONBOARDING_VERSION) {
@@ -158,13 +177,30 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
 
-        List<AppItem> refreshed = loadApps();
-        if (!sameAppList(apps, refreshed)) {
-            apps = refreshed;
-            if (launcherAdapter != null) launcherAdapter.refreshApps();
+        reloadAppsAndSelections();
+        refreshExternalStateViews();
+
+        if (!batteryReceiverRegistered) {
+            registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            batteryReceiverRegistered = true;
         }
 
-        refreshExternalStateViews();
+        if (!packageReceiverRegistered) {
+            IntentFilter packageFilter = new IntentFilter();
+            packageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
+            packageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+            packageFilter.addAction(Intent.ACTION_PACKAGE_CHANGED);
+            packageFilter.addAction(Intent.ACTION_PACKAGE_REPLACED);
+            packageFilter.addDataScheme("package");
+
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(packageReceiver, packageFilter, Context.RECEIVER_EXPORTED);
+            } else {
+                registerReceiver(packageReceiver, packageFilter);
+            }
+            packageReceiverRegistered = true;
+        }
+
         handler.removeCallbacks(uiTicker);
         uiTicker.run();
     }
@@ -172,7 +208,28 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         handler.removeCallbacks(uiTicker);
+
+        if (batteryReceiverRegistered) {
+            try { unregisterReceiver(batteryReceiver); } catch (Exception ignored) {}
+            batteryReceiverRegistered = false;
+        }
+
+        if (packageReceiverRegistered) {
+            try { unregisterReceiver(packageReceiver); } catch (Exception ignored) {}
+            packageReceiverRegistered = false;
+        }
+
         super.onPause();
+    }
+
+    private void reloadAppsAndSelections() {
+        List<AppItem> refreshed = loadApps();
+        boolean changed = !sameAppList(apps, refreshed);
+        apps = refreshed;
+        boolean selectionsChanged = pruneSelectionSets();
+
+        if (changed && launcherAdapter != null) launcherAdapter.refreshApps();
+        if (changed || selectionsChanged) refreshExternalStateViews();
     }
 
     private boolean sameAppList(List<AppItem> a, List<AppItem> b) {
@@ -185,6 +242,25 @@ public class MainActivity extends Activity {
         return true;
     }
 
+    private boolean pruneSelectionSets() {
+        if (prefs == null) return false;
+
+        Set<String> installed = new HashSet<>();
+        for (AppItem app : apps) installed.add(app.pkg);
+
+        Set<String> hidden = hiddenSet();
+        Set<String> essential = essentialSet();
+        boolean changed = hidden.retainAll(installed) | essential.retainAll(installed);
+
+        if (changed) {
+            SharedPreferences.Editor e = prefs.edit();
+            e.putStringSet("hidden_packages", new HashSet<>(hidden));
+            e.putStringSet("essential_packages", new HashSet<>(essential));
+            e.apply();
+        }
+        return changed;
+    }
+
     private void refreshExternalStateViews() {
         if (accessibilityStatusView != null) {
             accessibilityStatusView.setText(HiddenAccessibilityService.isConnected() ? "ON" : "SET UP");
@@ -192,10 +268,21 @@ public class MainActivity extends Activity {
         if (defaultHomeStatusView != null) {
             defaultHomeStatusView.setText(isDefaultHome() ? "HIDDEN" : "CHANGE");
         }
+        if (favouriteCountView != null) {
+            favouriteCountView.setText(selectedCount(essentialSet()) + " SELECTED");
+        }
+        if (hiddenCountView != null) {
+            hiddenCountView.setText(selectedCount(hiddenSet()) + " HIDDEN");
+        }
+    }
+
+    private String currentTimeText() {
+        String pattern = DateFormat.is24HourFormat(this) ? "HH:mm" : "h:mm";
+        return new SimpleDateFormat(pattern, Locale.getDefault()).format(new Date());
     }
 
     private void updateLiveUtilities() {
-        String time = new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date());
+        String time = currentTimeText();
         String date = new SimpleDateFormat("EEEE · d MMMM", Locale.getDefault()).format(new Date());
         String battery = "BATTERY  " + batteryPercent() + "%";
 
@@ -750,7 +837,7 @@ public class MainActivity extends Activity {
         boolean hasBattery = modeOnHome("battery_mode");
 
         if (hasClock) {
-            TextView time = heading(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 68);
+            TextView time = heading(currentTimeText(), 68);
             homeClockView = time;
             time.setGravity(Gravity.CENTER);
             time.setIncludeFontPadding(false);
@@ -826,7 +913,7 @@ public class MainActivity extends Activity {
         info.setGravity(Gravity.CENTER);
 
         if (modeInDrawer("clock_mode")) {
-            TextView clock = text(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 14, fg);
+            TextView clock = text(currentTimeText(), 14, fg);
             drawerClockViews.add(clock);
             applyStrongTypeface(clock);
             clock.setGravity(Gravity.CENTER);
@@ -1043,6 +1130,8 @@ public class MainActivity extends Activity {
         currentScreen = Screen.SETTINGS;
         accessibilityStatusView = null;
         defaultHomeStatusView = null;
+        favouriteCountView = null;
+        hiddenCountView = null;
         applyPalette();
 
         ScrollView scroll = new ScrollView(this);
@@ -1100,10 +1189,14 @@ public class MainActivity extends Activity {
         accessibilityNote.setLineSpacing(0, 1.18f);
         pad(accessibilityNote, 0, 2, 0, 8);
         content.addView(accessibilityNote);
-        content.addView(actionRow("Favourite apps", selectedCount(essentialSet()) + " selected", v -> showAppPicker(true)));
+        LinearLayout favouriteRow = (LinearLayout)actionRow("Favourite apps", selectedCount(essentialSet()) + " SELECTED", v -> showAppPicker(true));
+        favouriteCountView = (TextView)favouriteRow.getChildAt(1);
+        content.addView(favouriteRow);
 
         addSectionTitle(content, "HIDDEN");
-        content.addView(actionRow("HIDDEN apps", selectedCount(hiddenSet()) + " hidden", v -> showAppPicker(false)));
+        LinearLayout hiddenRow = (LinearLayout)actionRow("HIDDEN apps", selectedCount(hiddenSet()) + " HIDDEN", v -> showAppPicker(false));
+        hiddenCountView = (TextView)hiddenRow.getChildAt(1);
+        content.addView(hiddenRow);
         content.addView(actionRow("Review notifications", "Android settings", v -> showNotificationReview()));
 
         addSectionTitle(content, "APPEARANCE");
@@ -1130,23 +1223,6 @@ public class MainActivity extends Activity {
 
         setContentView(scroll);
         if (restoreY > 0) scroll.post(() -> scroll.scrollTo(0, restoreY));
-    }
-
-    private void revealAboveKeyboard(View child) {
-        child.postDelayed(() -> {
-            ViewParent p = child.getParent();
-            while (p != null) {
-                if (p instanceof ScrollView) {
-                    ScrollView sv = (ScrollView)p;
-                    Rect r = new Rect();
-                    child.getDrawingRect(r);
-                    sv.offsetDescendantRectToMyCoords(child, r);
-                    sv.smoothScrollTo(0, Math.max(0, r.top - dp(110)));
-                    break;
-                }
-                p = p.getParent();
-            }
-        }, 260);
     }
 
     private TextView boldAction(String label) {
@@ -1200,22 +1276,6 @@ public class MainActivity extends Activity {
             prefs.edit().putBoolean(key, next).apply();
             right.setText(next ? "ON" : "OFF");
         });
-        return row;
-    }
-
-    private View cycleRow(String label, String value, View.OnClickListener listener) {
-        LinearLayout row = settingRowBase();
-        TextView left = text(label, 17, fg);
-        TextView right = text(value, 13, muted);
-        right.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        left.setMaxLines(2);
-        right.setMaxLines(2);
-        right.setEllipsize(TextUtils.TruncateAt.END);
-        row.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        rp.leftMargin = dp(12);
-        row.addView(right, rp);
-        row.setOnClickListener(listener);
         return row;
     }
 
@@ -2721,12 +2781,6 @@ public class MainActivity extends Activity {
             return globalStyledText(value);
         }
 
-        private String glitchLabel(String label) {
-            int mod = Math.abs(label.hashCode()) % 3;
-            if (mod == 0) return "▌ " + label + "  ░";
-            if (mod == 1) return "░ " + label + "  ▌";
-            return "▓ " + label;
-        }
     }
 
     static class HiddenApp {
