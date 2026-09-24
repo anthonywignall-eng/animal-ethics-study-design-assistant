@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="hidden_icon_background">#050606</color>
+    <color name="hidden_icon_foreground">#F5EFE2</color>
+</resources>
