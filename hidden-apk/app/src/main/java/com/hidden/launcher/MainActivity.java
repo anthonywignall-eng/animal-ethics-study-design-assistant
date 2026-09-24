@@ -391,7 +391,8 @@ public class MainActivity extends Activity {
         if ("grayscale".equals(raw)) return "dark";
         if ("system".equals(raw)) return ThemeArt.resolve("system", getResources());
         if ("light".equals(raw) || "dark".equals(raw) || "oled".equals(raw) ||
-            "doom_light".equals(raw) || "doom_dark".equals(raw) || "8bit".equals(raw)) {
+            "doom_light".equals(raw) || "doom_dark".equals(raw) || "8bit".equals(raw) ||
+            "soft_launch".equals(raw) || "moth".equals(raw)) {
             return raw;
         }
         return "dark";
@@ -412,7 +413,7 @@ public class MainActivity extends Activity {
     private boolean useDarkPalette() {
         String mode = currentTheme();
         return "dark".equals(mode) || "oled".equals(mode) ||
-            "doom_dark".equals(mode) || "8bit".equals(mode);
+            "doom_dark".equals(mode) || "8bit".equals(mode) || "moth".equals(mode);
     }
 
     private void setPaletteValues(String rawTheme) {
@@ -520,6 +521,12 @@ public class MainActivity extends Activity {
         } else if (isDoomTheme()) {
             t.setTypeface(Typeface.create("sans-serif-condensed", Typeface.NORMAL));
             t.setLetterSpacing(0.035f);
+        } else if (isTheme("soft_launch")) {
+            t.setTypeface(Typeface.create("sans-serif-rounded", Typeface.NORMAL));
+            t.setLetterSpacing(0.01f);
+        } else if (isTheme("moth")) {
+            t.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+            t.setLetterSpacing(0.018f);
         } else {
             t.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         }
@@ -533,6 +540,12 @@ public class MainActivity extends Activity {
         } else if (isDoomTheme()) {
             t.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
             t.setLetterSpacing(0.055f);
+        } else if (isTheme("soft_launch")) {
+            t.setTypeface(Typeface.create("sans-serif-rounded", Typeface.BOLD));
+            t.setLetterSpacing(0.015f);
+        } else if (isTheme("moth")) {
+            t.setTypeface(Typeface.create("serif", Typeface.BOLD));
+            t.setLetterSpacing(0.025f);
         } else {
             t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         }
@@ -921,6 +934,12 @@ public class MainActivity extends Activity {
         } else if (isDoomTheme()) {
             search.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
             search.setLetterSpacing(0.04f);
+        } else if (isTheme("soft_launch")) {
+            search.setTypeface(Typeface.create("sans-serif-rounded", Typeface.NORMAL));
+            search.setLetterSpacing(0.01f);
+        } else if (isTheme("moth")) {
+            search.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+            search.setLetterSpacing(0.02f);
         }
         pad(search, 14, 8, 14, 8);
         search.setText(launcherAdapter == null ? "" : launcherAdapter.query);
@@ -1173,7 +1192,7 @@ public class MainActivity extends Activity {
         defaultHomeStatusView = (TextView)homeRoleRow.getChildAt(1);
         content.addView(homeRoleRow);
 
-        TextView version = text("HIDDEN · v0.7.1", 12, muted);
+        TextView version = text("HIDDEN · v0.8", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -1491,7 +1510,7 @@ public class MainActivity extends Activity {
         copy.setLineSpacing(0, 1.22f);
         content.addView(copy);
 
-        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "8bit"};
+        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "8bit", "soft_launch", "moth"};
         for (String theme : themes) {
             boolean selected = theme.equals(currentTheme());
             ThemePreviewView preview = new ThemePreviewView(this, theme, selected);
@@ -1682,6 +1701,8 @@ public class MainActivity extends Activity {
         if ("doom_light".equals(t)) return "DOOM SCROLL LIGHT";
         if ("doom_dark".equals(t)) return "DOOM SCROLL DARK";
         if ("8bit".equals(t)) return "8-BIT";
+        if ("soft_launch".equals(t)) return "SOFT LAUNCH";
+        if ("moth".equals(t)) return "MOTH TO A FLAME";
         return "DARK";
     }
 
@@ -1705,7 +1726,7 @@ public class MainActivity extends Activity {
         pad(copy, 0, 6, 0, 12);
         content.addView(copy);
 
-        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "8bit"};
+        String[] themes = {"light", "dark", "oled", "doom_light", "doom_dark", "8bit", "soft_launch", "moth"};
         for (String theme : themes) {
             boolean selected = theme.equals(currentTheme());
             ThemePreviewView preview = new ThemePreviewView(this, theme, selected);
@@ -2206,10 +2227,19 @@ public class MainActivity extends Activity {
             String label = themeLabel(theme);
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setTextSize(dp(15));
-            paint.setTypeface("8bit".equals(theme)
-                ? Typeface.MONOSPACE
-                : Typeface.create("sans-serif", Typeface.BOLD));
-            paint.setAntiAlias(!"8bit".equals(theme));
+            if ("8bit".equals(theme)) {
+                paint.setTypeface(Typeface.MONOSPACE);
+                paint.setAntiAlias(false);
+            } else if ("soft_launch".equals(theme)) {
+                paint.setTypeface(Typeface.create("sans-serif-rounded", Typeface.BOLD));
+                paint.setAntiAlias(true);
+            } else if ("moth".equals(theme)) {
+                paint.setTypeface(Typeface.create("serif", Typeface.BOLD));
+                paint.setAntiAlias(true);
+            } else {
+                paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+                paint.setAntiAlias(true);
+            }
 
             int textColor = ThemeArt.foreground(theme, getResources());
             paint.setColor(textColor);
@@ -2683,6 +2713,14 @@ public class MainActivity extends Activity {
                 if (strong) {
                     t.setShadowLayer(1.6f, 0f, 1f, "doom_light".equals(theme) ? Color.argb(120,255,250,238) : Color.argb(220,0,0,0));
                 }
+            } else if ("soft_launch".equals(theme)) {
+                t.setText(value);
+                t.setTypeface(Typeface.create("sans-serif-rounded", strong ? Typeface.BOLD : Typeface.NORMAL));
+                t.setLetterSpacing(strong ? 0.018f : 0.01f);
+            } else if ("moth".equals(theme)) {
+                t.setText(value);
+                t.setTypeface(Typeface.create(strong ? "serif" : "sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
+                t.setLetterSpacing(strong ? 0.026f : 0.018f);
             } else {
                 t.setText(value);
                 t.setTypeface(Typeface.create("sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
@@ -2700,6 +2738,10 @@ public class MainActivity extends Activity {
             } else if ("doom_light".equals(theme) || "doom_dark".equals(theme)) {
                 t.setText(earthyDoomText(value));
                 t.setTypeface(Typeface.create("sans-serif-condensed", strong ? Typeface.BOLD : Typeface.NORMAL));
+            } else if ("soft_launch".equals(theme)) {
+                t.setTypeface(Typeface.create("sans-serif-rounded", strong ? Typeface.BOLD : Typeface.NORMAL));
+            } else if ("moth".equals(theme)) {
+                t.setTypeface(Typeface.create(strong ? "serif" : "sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
             } else {
                 t.setTypeface(Typeface.create("sans-serif", strong ? Typeface.BOLD : Typeface.NORMAL));
             }
