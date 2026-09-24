@@ -108,6 +108,7 @@ public class MainActivity extends Activity {
     private EditText stickyDrawerSearch;
     private EditText flowDrawerSearch;
     private boolean syncingDrawerSearch = false;
+    private boolean drawerSearchActive = false;
     private String renderThemeOverride = null;
     private String onboardingThemeTarget = "home_theme";
 
@@ -402,6 +403,7 @@ public class MainActivity extends Activity {
         launcherRecycler.setAdapter(launcherAdapter);
         frame.addView(launcherRecycler, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        drawerSearchActive = false;
         stickyDrawerSearch = null;
         flowDrawerSearch = null;
         drawerShelf = buildDrawerShelf(false);
@@ -446,13 +448,15 @@ public class MainActivity extends Activity {
                     && first >= launcherAdapter.firstAppPosition()
                     && beforeDoom;
 
-                View headerView = lm.findViewByPosition(1);
+                int headerPos = launcherAdapter.headerPosition();
+                View headerView = lm.findViewByPosition(headerPos);
                 boolean headerReachedTop =
-                    first > 1 ||
-                    (first == 1 && headerView != null && headerView.getTop() <= 0);
+                    launcherAdapter.isSearchMode() ||
+                    first > headerPos ||
+                    (first == headerPos && headerView != null && headerView.getTop() <= 0);
 
                 setAlphabetRailVisible(showRail);
-                setDrawerShelfVisible(headerReachedTop && beforeDoom);
+                setDrawerShelfVisible((launcherAdapter.isSearchMode() || headerReachedTop) && beforeDoom);
 
                 if (hiddenStart >= 0) {
                     if (!insideHidden && first >= hiddenStart) {
@@ -687,6 +691,14 @@ public class MainActivity extends Activity {
             @Override public void afterTextChanged(Editable value) {}
         });
 
+        search.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                enterDrawerSearch();
+            } else {
+                handler.postDelayed(this::maybeExitDrawerSearch, 140);
+            }
+        });
+
         TextView settings = text("HIDDEN SETTINGS", 12, muted);
         applyStrongTypeface(settings);
         settings.setGravity(Gravity.CENTER);
@@ -699,6 +711,40 @@ public class MainActivity extends Activity {
         shelf.addView(divider, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
 
         return shelf;
+    }
+
+    private void enterDrawerSearch() {
+        if (!drawerSearchActive) {
+            drawerSearchActive = true;
+            if (launcherAdapter != null) launcherAdapter.refreshForSearchMode();
+        }
+        setAlphabetRailVisible(false);
+        setDrawerShelfVisible(true);
+        pinSearchResultsToTop();
+    }
+
+    private void maybeExitDrawerSearch() {
+        boolean stickyFocused = stickyDrawerSearch != null && stickyDrawerSearch.hasFocus();
+        boolean flowFocused = flowDrawerSearch != null && flowDrawerSearch.hasFocus();
+        String q = launcherAdapter == null ? "" : launcherAdapter.query;
+
+        if (!stickyFocused && !flowFocused && q.trim().isEmpty() && drawerSearchActive) {
+            drawerSearchActive = false;
+            if (launcherAdapter != null) launcherAdapter.refreshForSearchMode();
+        }
+    }
+
+    private void pinSearchResultsToTop() {
+        if (launcherRecycler == null) return;
+        launcherRecycler.post(() -> {
+            RecyclerView.LayoutManager manager = launcherRecycler.getLayoutManager();
+            if (manager instanceof LinearLayoutManager) {
+                ((LinearLayoutManager)manager).scrollToPositionWithOffset(0, 0);
+            } else {
+                launcherRecycler.scrollToPosition(0);
+            }
+            setDrawerShelfVisible(true);
+        });
     }
 
     private void syncDrawerSearch(EditText source, String value) {
@@ -719,8 +765,13 @@ public class MainActivity extends Activity {
 
         syncingDrawerSearch = false;
 
+        if (!value.trim().isEmpty() && !drawerSearchActive) drawerSearchActive = true;
         if (launcherAdapter != null) launcherAdapter.setQuery(value);
-        if (!value.trim().isEmpty()) setAlphabetRailVisible(false);
+        if (drawerSearchActive || !value.trim().isEmpty()) {
+            setAlphabetRailVisible(false);
+            setDrawerShelfVisible(true);
+            pinSearchResultsToTop();
+        }
     }
 
     private LinearLayout buildDrawerHeader() {
@@ -877,7 +928,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.6", 12, muted);
+        TextView version = text("HIDDEN · v0.6.1", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -2281,12 +2332,24 @@ public class MainActivity extends Activity {
 
         void setQuery(String value) {
             String next = value == null ? "" : value.trim();
-            if (next.equals(query)) return;
+            if (next.equals(query) && isSearchMode() == drawerSearchActive) return;
             query = next;
             rebuild();
             notifyDataSetChanged();
+            if (isSearchMode()) pinSearchResultsToTop();
         }
 
+        void refreshForSearchMode() {
+            rebuild();
+            notifyDataSetChanged();
+            if (isSearchMode()) pinSearchResultsToTop();
+        }
+
+        boolean isSearchMode() {
+            return drawerSearchActive || !query.isEmpty();
+        }
+
+        int headerPosition() { return isSearchMode() ? 0 : 1; }
         int firstAppPosition() { return firstAppPos; }
         int journeyPosition() { return journeyPos; }
         int hiddenHeaderPosition() { return hiddenHeaderPos; }
@@ -2316,12 +2379,18 @@ public class MainActivity extends Activity {
             journeyPos = -1;
             hiddenHeaderPos = -1;
 
-            items.add("HOME");
-            items.add("HEADER");
-            firstAppPos = 2;
+            String q = query.toLowerCase(Locale.ROOT);
+
+            if (isSearchMode()) {
+                items.add("HEADER");
+                firstAppPos = 1;
+            } else {
+                items.add("HOME");
+                items.add("HEADER");
+                firstAppPos = 2;
+            }
 
             Set<String> hidden = hiddenSet();
-            String q = query.toLowerCase(Locale.ROOT);
 
             for (AppItem app : apps) {
                 if (hidden.contains(app.pkg)) continue;
@@ -2336,7 +2405,7 @@ public class MainActivity extends Activity {
                 }
             }
 
-            if (!q.isEmpty() || hidden.isEmpty()) return;
+            if (isSearchMode() || hidden.isEmpty()) return;
 
             if (!doomPaused()) {
                 journeyPos = items.size();
