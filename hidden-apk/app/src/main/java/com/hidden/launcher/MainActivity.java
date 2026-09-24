@@ -2008,13 +2008,26 @@ public class MainActivity extends Activity {
 
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            painapplyStrongTypeface(t);
+
+            paint.setTypeface(isTheme("8bit")
+                ? Typeface.MONOSPACE
+                : Typeface.create("sans-serif", Typeface.BOLD));
+            paint.setAntiAlias(!isTheme("8bit"));
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setTextSize(dp(10));
-            paint.setColor(muted);
+
+            int[] doomColors = {
+                Color.rgb(205, 146, 129),
+                Color.rgb(168, 174, 137),
+                Color.rgb(202, 171, 112),
+                Color.rgb(143, 139, 154),
+                Color.rgb(190, 154, 146),
+                Color.rgb(151, 168, 157)
+            };
 
             float step = getHeight() / (float)letters.length();
             for (int i = 0; i < letters.length(); i++) {
+                paint.setColor(isTheme("doom") ? doomColors[i % doomColors.length] : muted);
                 float y = step * i + step * 0.7f;
                 canvas.drawText(String.valueOf(letters.charAt(i)), getWidth() - dp(13), y, paint);
             }
