@@ -103,6 +103,9 @@ public class MainActivity extends Activity {
     private boolean alphabetRailTargetVisible = false;
     private LinearLayout drawerShelf;
     private boolean drawerShelfTargetVisible = false;
+    private EditText stickyDrawerSearch;
+    private EditText flowDrawerSearch;
+    private boolean syncingDrawerSearch = false;
 
     private enum Screen { HOME, SETTINGS, ONBOARDING, PICKER, NOTIFICATION_REVIEW, INTRO }
 
@@ -310,13 +313,15 @@ public class MainActivity extends Activity {
         launcherRecycler.setAdapter(launcherAdapter);
         frame.addView(launcherRecycler, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        drawerShelf = buildDrawerShelf();
+        stickyDrawerSearch = null;
+        flowDrawerSearch = null;
+        drawerShelf = buildDrawerShelf(false);
         drawerShelfTargetVisible = false;
         drawerShelf.setAlpha(0f);
         drawerShelf.setVisibility(View.INVISIBLE);
         FrameLayout.LayoutParams shelfParams = new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(98),
+            dp(148),
             Gravity.TOP
         );
         frame.addView(drawerShelf, shelfParams);
@@ -326,7 +331,7 @@ public class MainActivity extends Activity {
         alphabetRail.setAlpha(0f);
         alphabetRail.setVisibility(View.INVISIBLE);
         FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(52), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END);
-        rp.topMargin = dp(108);
+        rp.topMargin = dp(158);
         rp.bottomMargin = dp(18);
         frame.addView(alphabetRail, rp);
 
@@ -506,11 +511,15 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout buildDrawerShelf() {
+        return buildDrawerShelf(false);
+    }
+
+    private LinearLayout buildDrawerShelf(boolean inFlow) {
         LinearLayout shelf = new LinearLayout(this);
         shelf.setOrientation(LinearLayout.VERTICAL);
         shelf.setGravity(Gravity.CENTER_HORIZONTAL);
         shelf.setBackgroundColor(bg);
-        pad(shelf, 24, 10, 58, 8);
+        pad(shelf, 24, 7, 24, 0);
 
         LinearLayout info = new LinearLayout(this);
         info.setGravity(Gravity.CENTER);
@@ -519,13 +528,13 @@ public class MainActivity extends Activity {
             TextView clock = heading(new SimpleDateFormat("h:mm", Locale.getDefault()).format(new Date()), 24);
             clock.setGravity(Gravity.CENTER);
             clock.setIncludeFontPadding(false);
-            info.addView(clock, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+            info.addView(clock, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
         }
 
         if (modeInDrawer("clock_mode") && modeInDrawer("battery_mode")) {
             TextView dot = text("  ·  ", 14, muted);
             dot.setGravity(Gravity.CENTER);
-            info.addView(dot, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+            info.addView(dot, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
         }
 
         if (modeInDrawer("battery_mode")) {
@@ -533,54 +542,92 @@ public class MainActivity extends Activity {
             battery.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
             battery.setLetterSpacing(0.10f);
             battery.setGravity(Gravity.CENTER);
-            info.addView(battery, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
+            info.addView(battery, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
         }
 
-        shelf.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36)));
+        shelf.addView(info, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34)));
 
-        TextView settings = heading("HIDDEN Settings", 15);
+        EditText search = new EditText(this);
+        search.setHint("Search apps");
+        search.setSingleLine(true);
+        search.setTextSize(15);
+        search.setTextColor(fg);
+        search.setHintTextColor(muted);
+        search.setBackgroundColor(panel);
+        pad(search, 14, 8, 14, 8);
+        search.setText(launcherAdapter == null ? "" : launcherAdapter.query);
+        search.setSelection(search.length());
+
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(46)
+        );
+        searchParams.topMargin = dp(4);
+        shelf.addView(search, searchParams);
+
+        if (inFlow) flowDrawerSearch = search;
+        else stickyDrawerSearch = search;
+
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) {}
+
+            @Override public void onTextChanged(CharSequence value, int start, int before, int count) {
+                syncDrawerSearch(search, value.toString());
+            }
+
+            @Override public void afterTextChanged(Editable value) {}
+        });
+
+        TextView settings = text("HIDDEN SETTINGS", 12, muted);
+        settings.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         settings.setGravity(Gravity.CENTER);
-        settings.setLetterSpacing(0.025f);
+        settings.setLetterSpacing(0.12f);
         settings.setOnClickListener(v -> showSettings());
         shelf.addView(settings, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
 
+        View divider = new View(this);
+        divider.setBackgroundColor(line);
+        shelf.addView(divider, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
+
         return shelf;
+    }
+
+    private void syncDrawerSearch(EditText source, String value) {
+        if (syncingDrawerSearch) return;
+        syncingDrawerSearch = true;
+
+        if (stickyDrawerSearch != null && stickyDrawerSearch != source &&
+            !stickyDrawerSearch.getText().toString().equals(value)) {
+            stickyDrawerSearch.setText(value);
+            stickyDrawerSearch.setSelection(stickyDrawerSearch.length());
+        }
+
+        if (flowDrawerSearch != null && flowDrawerSearch != source &&
+            !flowDrawerSearch.getText().toString().equals(value)) {
+            flowDrawerSearch.setText(value);
+            flowDrawerSearch.setSelection(flowDrawerSearch.length());
+        }
+
+        syncingDrawerSearch = false;
+
+        if (launcherAdapter != null) launcherAdapter.setQuery(value);
+        if (!value.trim().isEmpty()) setAlphabetRailVisible(false);
     }
 
     private LinearLayout buildDrawerHeader() {
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.VERTICAL);
         top.setBackgroundColor(bg);
-        pad(top, 0, 0, 0, 14);
+        top.setLayoutParams(new RecyclerView.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
 
-        LinearLayout inFlowShelf = buildDrawerShelf();
-        top.addView(inFlowShelf, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(98)));
-
-        LinearLayout searchWrap = new LinearLayout(this);
-        searchWrap.setOrientation(LinearLayout.VERTICAL);
-        pad(searchWrap, 26, 8, 58, 0);
-
-        EditText search = new EditText(this);
-        search.setHint("Search apps");
-        search.setSingleLine(true);
-        search.setTextSize(16);
-        search.setTextColor(fg);
-        search.setHintTextColor(muted);
-        search.setBackgroundColor(panel);
-        pad(search, 14, 9, 14, 9);
-        search.setText(launcherAdapter == null ? "" : launcherAdapter.query);
-        search.setSelection(search.length());
-        searchWrap.addView(search, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
-        top.addView(searchWrap);
-
-        search.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (launcherAdapter != null) launcherAdapter.setQuery(s.toString());
-                if (!s.toString().trim().isEmpty()) setAlphabetRailVisible(false);
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
+        LinearLayout inFlowShelf = buildDrawerShelf(true);
+        top.addView(inFlowShelf, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(148)
+        ));
 
         return top;
     }
@@ -714,7 +761,7 @@ public class MainActivity extends Activity {
         content.addView(actionRow("Replay welcome", "intro + setup", v -> showIntroWelcome()));
         content.addView(actionRow("Default Home app", isDefaultHome() ? "HIDDEN" : "change", v -> requestHomeRole()));
 
-        TextView version = text("HIDDEN · v0.4.1", 12, muted);
+        TextView version = text("HIDDEN · v0.4.2", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -2075,6 +2122,10 @@ public class MainActivity extends Activity {
             if (type == TYPE_HIDDEN_HEADER) {
                 LinearLayout block = new LinearLayout(MainActivity.this);
                 block.setOrientation(LinearLayout.VERTICAL);
+                block.setLayoutParams(new RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ));
                 pad(block, 26, 24, 26, 16);
                 return new SimpleHolder(block);
             }
@@ -2082,6 +2133,10 @@ public class MainActivity extends Activity {
             if (type == TYPE_REWIND) {
                 TextView rewind = heading("REWIND  ↑", 18);
                 rewind.setGravity(Gravity.CENTER);
+                rewind.setLayoutParams(new RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ));
                 pad(rewind, 20, 26, 20, 34);
                 return new SimpleHolder(rewind);
             }
