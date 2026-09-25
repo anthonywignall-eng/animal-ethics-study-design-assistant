@@ -204,6 +204,95 @@ public final class ThemeArt {
         }
     }
 
+    private static void drawSoftBotanicalEdges(Canvas canvas, int width, int height, long seed) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Random random = new Random(seed ^ 0xB07A11L);
+
+        int sprays = Math.max(7, height / Math.max(1, width / 2));
+        for (int i = 0; i < sprays; i++) {
+            boolean left = i % 2 == 0;
+            float y = height * (0.10f + (i + 0.5f) / sprays * 0.78f) + (random.nextFloat() - 0.5f) * height * 0.06f;
+            float reach = width * (0.13f + random.nextFloat() * 0.10f);
+            float baseX = left ? -width * 0.015f : width * 1.015f;
+            float tipX = left ? reach : width - reach;
+            int green = random.nextBoolean() ? Color.rgb(101, 128, 91) : Color.rgb(125, 145, 105);
+
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeWidth(Math.max(2f, width * 0.0045f));
+            p.setColor(Color.argb(150, Color.red(green), Color.green(green), Color.blue(green)));
+
+            Path stem = new Path();
+            stem.moveTo(baseX, y + height * 0.035f);
+            stem.cubicTo(
+                left ? width * 0.03f : width * 0.97f, y + height * 0.015f,
+                left ? width * 0.08f : width * 0.92f, y - height * 0.025f,
+                tipX, y
+            );
+            canvas.drawPath(stem, p);
+
+            p.setStyle(Paint.Style.FILL);
+            for (int leaf = 0; leaf < 5; leaf++) {
+                float t = 0.18f + leaf * 0.16f;
+                float cx = baseX + (tipX - baseX) * t;
+                float cy = y + height * (0.025f - t * 0.035f) + (leaf % 2 == 0 ? -1 : 1) * height * 0.008f;
+                float lw = width * (0.032f + random.nextFloat() * 0.012f);
+                float lh = width * 0.010f;
+                p.setColor(Color.argb(120 + random.nextInt(40), Color.red(green), Color.green(green), Color.blue(green)));
+                canvas.save();
+                canvas.rotate((left ? -18f : 18f) + (leaf % 2 == 0 ? -24f : 24f), cx, cy);
+                canvas.drawOval(new RectF(cx - lw, cy - lh, cx + lw, cy + lh), p);
+                canvas.restore();
+            }
+
+            int flowerType = i % 4;
+            float fx = left ? width * (0.07f + random.nextFloat() * 0.08f) : width * (0.93f - random.nextFloat() * 0.08f);
+            float fs = width * (0.022f + random.nextFloat() * 0.010f);
+
+            if (flowerType == 0) {
+                p.setColor(Color.argb(190, 229, 183, 66));
+                for (int n = 0; n < 6; n++) {
+                    float ox = (n % 2 == 0 ? -1f : 1f) * fs * 0.42f;
+                    float oy = (n - 2.5f) * fs * 0.43f;
+                    canvas.drawCircle(fx + ox, y + oy, fs * 0.23f, p);
+                }
+            } else if (flowerType == 1) {
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(1f, fs * 0.10f));
+                p.setColor(Color.argb(175, 213, 111, 143));
+                for (int n = 0; n < 14; n++) {
+                    double a = Math.PI * 2d * n / 14d;
+                    canvas.drawLine(fx, y, fx + (float)Math.cos(a) * fs, y + (float)Math.sin(a) * fs, p);
+                }
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb(190, 239, 181, 186));
+                canvas.drawCircle(fx, y, fs * 0.26f, p);
+            } else if (flowerType == 2) {
+                p.setColor(Color.argb(185, 184, 67, 83));
+                for (int n = 0; n < 8; n++) {
+                    double a = Math.PI * 2d * n / 8d;
+                    float cx = fx + (float)Math.cos(a) * fs * 0.42f;
+                    float cy = y + (float)Math.sin(a) * fs * 0.34f;
+                    canvas.drawOval(new RectF(cx - fs * 0.18f, cy - fs * 0.31f, cx + fs * 0.18f, cy + fs * 0.31f), p);
+                }
+                p.setColor(Color.argb(195, 225, 129, 127));
+                canvas.drawCircle(fx, y, fs * 0.27f, p);
+            } else {
+                p.setColor(Color.argb(175, 191, 132, 78));
+                RectF cone = new RectF(fx - fs * 0.32f, y - fs * 0.95f, fx + fs * 0.32f, y + fs * 0.65f);
+                canvas.drawRoundRect(cone, fs * 0.24f, fs * 0.24f, p);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(Math.max(1f, fs * 0.07f));
+                p.setColor(Color.argb(160, 235, 177, 112));
+                for (int n = 0; n < 5; n++) {
+                    float yy = y - fs * 0.67f + n * fs * 0.28f;
+                    canvas.drawLine(fx - fs * 0.20f, yy, fx + fs * 0.20f, yy, p);
+                }
+                p.setStyle(Paint.Style.FILL);
+            }
+        }
+    }
+
     private static void drawMothPaper(Canvas canvas, int width, int height, long seed) {
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         Random random = new Random(seed ^ 0xA117L);
