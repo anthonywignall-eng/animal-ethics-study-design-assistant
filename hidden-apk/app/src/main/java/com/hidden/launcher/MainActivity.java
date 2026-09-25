@@ -84,7 +84,7 @@ public class MainActivity extends Activity {
     private static final String MODE_OFF = "off";
     private static final long HALF_HOUR = 30L * 60L * 1000L;
     private static final long REPEAT_WINDOW = 2L * 60L * 1000L;
-    private static final int ONBOARDING_VERSION = 8;
+    private static final int ONBOARDING_VERSION = 9;
 
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -1316,7 +1316,7 @@ public class MainActivity extends Activity {
         defaultHomeStatusView = (TextView)homeRoleRow.getChildAt(1);
         content.addView(homeRoleRow);
 
-        TextView version = text("HIDDEN · v0.8", 12, muted);
+        TextView version = text("HIDDEN · v0.8.1", 12, muted);
         pad(version, 0, 26, 0, 0);
         content.addView(version);
 
@@ -1663,25 +1663,100 @@ public class MainActivity extends Activity {
 
         String selected = prefs.getString("app_appearance", "text");
 
-        TextView textOnly = pickerCard(
-            "TEXT ONLY" + ("text".equals(selected) ? "  ✓" : ""),
-            "Calculator   Calendar   Camera"
-        );
+        LinearLayout textOnly = appearancePreviewCard("TEXT ONLY", "text".equals(selected), false);
         textOnly.setOnClickListener(v -> {
             prefs.edit().putString("app_appearance", "text").apply();
             showOnboarding(3);
         });
         content.addView(textOnly);
 
-        TextView iconsText = pickerCard(
-            "ICONS + TEXT" + ("icons_text".equals(selected) ? "  ✓" : ""),
-            "◉  Calculator    ◉  Calendar    ◉  Camera"
-        );
+        LinearLayout iconsText = appearancePreviewCard("ICONS + TEXT", "icons_text".equals(selected), true);
         iconsText.setOnClickListener(v -> {
             prefs.edit().putString("app_appearance", "icons_text").apply();
             showOnboarding(3);
         });
         content.addView(iconsText);
+    }
+
+    private LinearLayout appearancePreviewCard(String label, boolean selected, boolean withIcons) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackgroundColor(panel);
+        pad(card, 16, 13, 16, 12);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView name = heading(label, 17);
+        header.addView(name, new LinearLayout.LayoutParams(0, dp(34), 1f));
+
+        TextView mark = text(selected ? "✓" : "○", selected ? 20 : 19, selected ? fg : muted);
+        mark.setGravity(Gravity.CENTER);
+        if (selected) applyStrongTypeface(mark);
+        header.addView(mark, new LinearLayout.LayoutParams(dp(36), dp(34)));
+        card.addView(header);
+
+        List<AppItem> samples = appearanceSampleApps();
+        String[] fallback = {"Calculator", "Calendar", "Camera"};
+
+        for (int i = 0; i < 3; i++) {
+            AppItem app = i < samples.size() ? samples.get(i) : null;
+
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setMinimumHeight(dp(34));
+
+            if (withIcons) {
+                if (app != null) {
+                    ImageView icon = appIconView(app, blendColor(panel, bg, 0.24f));
+                    row.addView(icon, new LinearLayout.LayoutParams(dp(28), dp(28)));
+                } else {
+                    View dot = new View(this);
+                    dot.setBackground(appIconBackground(blendColor(panel, bg, 0.24f)));
+                    row.addView(dot, new LinearLayout.LayoutParams(dp(28), dp(28)));
+                }
+            }
+
+            String rowName = app != null ? app.label : fallback[i];
+            TextView appName = text(rowName, 14, fg);
+            applyRegularTypeface(appName);
+            appName.setSingleLine(true);
+            appName.setEllipsize(TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(34), 1f);
+            if (withIcons) lp.leftMargin = dp(11);
+            row.addView(appName, lp);
+
+            card.addView(row);
+        }
+
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        cp.topMargin = dp(14);
+        card.setLayoutParams(cp);
+        return card;
+    }
+
+    private List<AppItem> appearanceSampleApps() {
+        ArrayList<AppItem> result = new ArrayList<>();
+        String[] preferred = {"Calculator", "Calendar", "Camera"};
+
+        for (String wanted : preferred) {
+            for (AppItem app : apps) {
+                if (app.label.equalsIgnoreCase(wanted) && !result.contains(app)) {
+                    result.add(app);
+                    break;
+                }
+            }
+        }
+
+        for (AppItem app : apps) {
+            if (result.size() >= 3) break;
+            if (hiddenSet().contains(app.pkg) || result.contains(app)) continue;
+            result.add(app);
+        }
+        return result;
     }
 
     private void onboardingWallpaper(LinearLayout content) {
