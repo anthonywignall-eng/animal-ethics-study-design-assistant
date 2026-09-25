@@ -46,6 +46,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -88,6 +89,7 @@ public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private List<AppItem> apps = new ArrayList<>();
+    private final Map<String, Drawable.ConstantState> appIconCache = new HashMap<>();
 
     private int bg;
     private int fg;
@@ -231,6 +233,7 @@ public class MainActivity extends Activity {
         List<AppItem> refreshed = loadApps();
         boolean changed = !sameAppList(apps, refreshed);
         apps = refreshed;
+        if (changed) appIconCache.clear();
         boolean selectionsChanged = pruneSelectionSets();
 
         if (changed && launcherAdapter != null) launcherAdapter.refreshApps();
@@ -327,7 +330,7 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (currentScreen == Screen.HOME && launcherRecycler != null) {
-            if (launcherAdapter != null && launcherAdapter.isSearchMode() && !searchKeyboardDismissed) {
+            if (launcherAdapter != null && launcherAdapter.isSearchMode() && isKeyboardVisible()) {
                 hideKeyboardKeepSearch();
                 return;
             }
@@ -802,6 +805,43 @@ public class MainActivity extends Activity {
         }
     }
 
+    private Drawable loadAppIcon(AppItem app) {
+        if (app == null) return null;
+        Drawable.ConstantState cached = appIconCache.get(app.pkg + "/" + app.activity);
+        if (cached != null) return cached.newDrawable(getResources()).mutate();
+
+        Drawable icon = null;
+        try {
+            icon = getPackageManager().getActivityIcon(new ComponentName(app.pkg, app.activity));
+        } catch (Exception ignored) {
+            try { icon = getPackageManager().getApplicationIcon(app.pkg); } catch (Exception ignoredAgain) {}
+        }
+
+        if (icon != null && icon.getConstantState() != null) {
+            appIconCache.put(app.pkg + "/" + app.activity, icon.getConstantState());
+            return icon.getConstantState().newDrawable(getResources()).mutate();
+        }
+        return icon;
+    }
+
+    private GradientDrawable appIconBackground(int color) {
+        GradientDrawable bgDrawable = new GradientDrawable();
+        bgDrawable.setShape(GradientDrawable.OVAL);
+        bgDrawable.setColor(color);
+        bgDrawable.setStroke(Math.max(1, dp(1)), line);
+        return bgDrawable;
+    }
+
+    private ImageView appIconView(AppItem app, int backgroundColor) {
+        ImageView icon = new ImageView(this);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        icon.setBackground(appIconBackground(backgroundColor));
+        icon.setPadding(dp(6), dp(6), dp(6), dp(6));
+        Drawable d = loadAppIcon(app);
+        if (d != null) icon.setImageDrawable(d);
+        return icon;
+    }
+
     private LinearLayout buildHomePanel() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -857,12 +897,31 @@ public class MainActivity extends Activity {
 
         for (AppItem app : apps) {
             if (essential.contains(app.pkg) && !hidden.contains(app.pkg)) {
-                TextView row = text(app.label, 21, fg);
-                applyStrongTypeface(row);
-                pad(row, 0, 5, 0, 5);
-                row.setOnClickListener(v -> launch(app));
-                row.setMinimumHeight(dp(48));
-                favourites.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                if (iconsAndText()) {
+                    LinearLayout row = new LinearLayout(this);
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setGravity(Gravity.CENTER_VERTICAL);
+                    row.setMinimumHeight(dp(52));
+
+                    ImageView icon = appIconView(app, panel);
+                    LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(38), dp(38));
+                    row.addView(icon, ip);
+
+                    TextView label = text(app.label, 21, fg);
+                    applyStrongTypeface(label);
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                    lp.leftMargin = dp(12);
+                    row.addView(label, lp);
+                    row.setOnClickListener(v -> launch(app));
+                    favourites.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                } else {
+                    TextView row = text(app.label, 21, fg);
+                    applyStrongTypeface(row);
+                    pad(row, 0, 5, 0, 5);
+                    row.setOnClickListener(v -> launch(app));
+                    row.setMinimumHeight(dp(48));
+                    favourites.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                }
             }
         }
 
@@ -1003,6 +1062,16 @@ public class MainActivity extends Activity {
         return shelf;
     }
 
+    private boolean isKeyboardVisible() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                WindowInsets insets = getWindow().getDecorView().getRootWindowInsets();
+                return insets != null && insets.isVisible(WindowInsets.Type.ime());
+            } catch (Exception ignored) {}
+        }
+        return !searchKeyboardDismissed && isDrawerSearchFocused();
+    }
+
     private boolean isDrawerSearchFocused() {
         return (stickyDrawerSearch != null && stickyDrawerSearch.hasFocus()) ||
             (flowDrawerSearch != null && flowDrawerSearch.hasFocus());
@@ -1074,6 +1143,20 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void restoreNormalDrawerAtHeader() {
+        if (launcherRecycler == null || launcherAdapter == null) return;
+        launcherRecycler.post(() -> {
+            RecyclerView.LayoutManager manager = launcherRecycler.getLayoutManager();
+            int header = launcherAdapter.headerPosition();
+            if (manager instanceof LinearLayoutManager) {
+                ((LinearLayoutManager)manager).scrollToPositionWithOffset(header, 0);
+            } else {
+                launcherRecycler.scrollToPosition(header);
+            }
+            setDrawerShelfVisible(true);
+        });
+    }
+
     private void syncDrawerSearch(EditText source, String value) {
         if (syncingDrawerSearch) return;
         syncingDrawerSearch = true;
@@ -1092,13 +1175,19 @@ public class MainActivity extends Activity {
 
         syncingDrawerSearch = false;
 
-        if (!value.trim().isEmpty() && !drawerSearchActive) drawerSearchActive = true;
-        if (launcherAdapter != null) launcherAdapter.setQuery(value);
-        if (drawerSearchActive || !value.trim().isEmpty()) {
-            setAlphabetRailVisible(false);
-            setDrawerShelfVisible(true);
-            pinSearchResultsToTop();
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            drawerSearchActive = false;
+            if (launcherAdapter != null) launcherAdapter.setQuery("");
+            restoreNormalDrawerAtHeader();
+            return;
         }
+
+        if (!drawerSearchActive) drawerSearchActive = true;
+        if (launcherAdapter != null) launcherAdapter.setQuery(value);
+        setAlphabetRailVisible(false);
+        setDrawerShelfVisible(true);
+        pinSearchResultsToTop();
     }
 
     private LinearLayout buildDrawerHeader() {
@@ -3078,11 +3167,18 @@ public class MainActivity extends Activity {
             }
 
             LinearLayout row = new LinearLayout(MainActivity.this);
-            row.setOrientation(LinearLayout.VERTICAL);
+            row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             row.setMinimumHeight(dp(54));
             pad(row, 26, 5, 58, 5);
+
+            ImageView icon = new ImageView(MainActivity.this);
+            icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            icon.setPadding(dp(6), dp(6), dp(6), dp(6));
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(38), dp(38));
+            ip.rightMargin = dp(12);
+            row.addView(icon, ip);
 
             TextView label = text("", 18, fg);
             label.setSingleLine(true);
@@ -3090,8 +3186,8 @@ public class MainActivity extends Activity {
             label.setEllipsize(TextUtils.TruncateAt.END);
             label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             label.setIncludeFontPadding(false);
-            row.addView(label, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            return new AppHolder(row, label);
+            row.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            return new AppHolder(row, icon, label);
         }
 
         @Override public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
@@ -3102,6 +3198,7 @@ public class MainActivity extends Activity {
                 AppHolder h = (AppHolder)holder;
                 h.root.setBackgroundColor(bg);
                 h.label.setTextColor(fg);
+                bindAppIcon(h, app, panel);
 
                 if (isTheme("8bit")) {
                     h.label.setText("> " + app.label.toUpperCase(Locale.ROOT));
@@ -3275,6 +3372,7 @@ public class MainActivity extends Activity {
             HiddenPalette hp = hiddenPalette();
             h.root.setBackgroundColor(hp.background);
             h.label.setTextColor(hp.foreground);
+            bindAppIcon(h, app, Color.argb(70, Color.red(hp.foreground), Color.green(hp.foreground), Color.blue(hp.foreground)));
 
             String theme = currentTheme();
             if ("8bit".equals(theme)) {
@@ -3315,12 +3413,37 @@ public class MainActivity extends Activity {
         SimpleHolder(View v) { super(v); }
     }
 
+    private void bindAppIcon(AppHolder holder, AppItem app, int backgroundColor) {
+        if (holder == null || holder.icon == null) return;
+        if (!iconsAndText()) {
+            holder.icon.setVisibility(View.GONE);
+            ViewGroup.LayoutParams params = holder.icon.getLayoutParams();
+            if (params instanceof LinearLayout.LayoutParams) {
+                ((LinearLayout.LayoutParams)params).rightMargin = 0;
+                holder.icon.setLayoutParams(params);
+            }
+            return;
+        }
+
+        holder.icon.setVisibility(View.VISIBLE);
+        ViewGroup.LayoutParams params = holder.icon.getLayoutParams();
+        if (params instanceof LinearLayout.LayoutParams) {
+            ((LinearLayout.LayoutParams)params).rightMargin = dp(12);
+            holder.icon.setLayoutParams(params);
+        }
+        holder.icon.setBackground(appIconBackground(backgroundColor));
+        Drawable iconDrawable = loadAppIcon(app);
+        holder.icon.setImageDrawable(iconDrawable);
+    }
+
     static class AppHolder extends RecyclerView.ViewHolder {
         final LinearLayout root;
+        final ImageView icon;
         final TextView label;
-        AppHolder(LinearLayout root, TextView label) {
+        AppHolder(LinearLayout root, ImageView icon, TextView label) {
             super(root);
             this.root = root;
+            this.icon = icon;
             this.label = label;
         }
     }
