@@ -452,6 +452,15 @@ public class MainActivity extends Activity {
         getWindow().getDecorView().setBackgroundColor(bg);
     }
 
+    private int blendColor(int from, int to, float amount) {
+        float t = Math.max(0f, Math.min(1f, amount));
+        return Color.rgb(
+            Math.round(Color.red(from) + (Color.red(to) - Color.red(from)) * t),
+            Math.round(Color.green(from) + (Color.green(to) - Color.green(from)) * t),
+            Math.round(Color.blue(from) + (Color.blue(to) - Color.blue(from)) * t)
+        );
+    }
+
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
@@ -3289,9 +3298,21 @@ public class MainActivity extends Activity {
             if (type == TYPE_APP) {
                 AppItem app = (AppItem)items.get(position);
                 AppHolder h = (AppHolder)holder;
-                h.root.setBackgroundColor(bg);
-                h.label.setTextColor(fg);
-                bindAppIcon(h, app, panel);
+                int rowBackground = bg;
+                int rowForeground = fg;
+                int iconPanel = panel;
+                if (isTheme("soft_launch") && journeyPos > 0) {
+                    int distance = journeyPos - position;
+                    if (distance >= 0 && distance < 9) {
+                        float creep = (9f - distance) / 9f * 0.58f;
+                        rowBackground = blendColor(bg, Color.rgb(42, 34, 45), creep);
+                        rowForeground = blendColor(fg, Color.rgb(247, 232, 220), creep);
+                        iconPanel = blendColor(panel, Color.rgb(72, 55, 68), creep);
+                    }
+                }
+                h.root.setBackgroundColor(rowBackground);
+                h.label.setTextColor(rowForeground);
+                bindAppIcon(h, app, iconPanel);
 
                 if (isTheme("8bit")) {
                     h.label.setText("> " + app.label.toUpperCase(Locale.ROOT));
