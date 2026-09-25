@@ -2509,31 +2509,58 @@ public class MainActivity extends Activity {
         }
 
         private void buildDecorations(int height) {
-            int decorStart = (int)(height * 0.78f);
             int screen = Math.max(1, getResources().getDisplayMetrics().heightPixels);
-            int zoneScreens = Math.max(1, (height - decorStart) / screen);
+            int totalScreens = Math.max(1, height / screen);
             int width = getResources().getDisplayMetrics().widthPixels;
 
             boolean flowers = "soft_launch".equals(journeyTheme);
             boolean moths = "moth".equals(journeyTheme);
-            int count = flowers ? Math.max(14, zoneScreens * 6)
-                : moths ? Math.max(14, zoneScreens * 6)
-                : Math.max(80, zoneScreens * 42);
 
+            if (flowers || moths) {
+                // The art gets deliberately busier the deeper the user travels.
+                // pow(u, <1) concentrates more objects near HIDDEN while keeping
+                // the first screens sparse enough to feel like a transition.
+                int count = flowers
+                    ? Math.max(110, totalScreens * 16)
+                    : Math.max(125, totalScreens * 19);
+
+                for (int i = 0; i < count; i++) {
+                    float u = random.nextFloat();
+                    float progress = (float)Math.pow(u, flowers ? 0.54f : 0.50f);
+                    float y = height * (0.055f + progress * 0.94f);
+
+                    float x;
+                    if (flowers) {
+                        // Early bush comes from the sides. Near HIDDEN the two
+                        // sides meet and the foliage can occupy the whole width.
+                        float reach = width * (0.10f + progress * 0.46f);
+                        boolean left = random.nextBoolean();
+                        x = left ? random.nextFloat() * reach : width - random.nextFloat() * reach;
+                    } else {
+                        // Moths are freer in the frame, but still densest at the end.
+                        x = random.nextFloat() * width;
+                    }
+
+                    float alpha = 0.68f + progress * 0.26f + random.nextFloat() * 0.06f;
+                    float size = flowers
+                        ? dp(18f + progress * 17f + random.nextFloat() * 8f)
+                        : dp(18f + progress * 15f + random.nextFloat() * 9f);
+                    float rotation = -30f + random.nextFloat() * 60f;
+                    float type = random.nextInt(flowers ? 6 : 5);
+                    decorations.add(new float[]{x, y, size, Math.min(1f, alpha), rotation, type, progress});
+                }
+                return;
+            }
+
+            int decorStart = (int)(height * 0.78f);
+            int zoneScreens = Math.max(1, (height - decorStart) / screen);
+            int count = Math.max(80, zoneScreens * 42);
             for (int i = 0; i < count; i++) {
                 float x = random.nextFloat() * width;
                 float y = decorStart + random.nextFloat() * Math.max(1, height - decorStart);
-                float alpha = flowers || moths
-                    ? 0.70f + random.nextFloat() * 0.30f
-                    : 0.35f + random.nextFloat() * 0.65f;
-                float size = flowers
-                    ? dp(15f + random.nextFloat() * 11f)
-                    : moths
-                        ? dp(13f + random.nextFloat() * 9f)
-                        : dp(1f + random.nextFloat() * 1.4f);
-                float rotation = -28f + random.nextFloat() * 56f;
-                float type = random.nextInt(flowers ? 6 : moths ? 5 : 1);
-                decorations.add(new float[]{x, y, size, alpha, rotation, type});
+                float r = dp(1f + random.nextFloat() * 1.4f);
+                float a = 0.35f + random.nextFloat() * 0.65f;
+                decorations.add(new float[]{x, y, r, a, 0f, 0f, 1f});
             }
         }
 
@@ -2547,9 +2574,10 @@ public class MainActivity extends Activity {
             int h = getHeight();
             int screen = getResources().getDisplayMetrics().heightPixels;
             int screens = prefs.getInt("doom_screens", 18);
-            int blankScreens = Math.min(4, Math.max(2, screens / 4));
+            boolean immersiveTheme = "soft_launch".equals(journeyTheme) || "moth".equals(journeyTheme);
+            int blankScreens = immersiveTheme ? 1 : Math.min(4, Math.max(2, screens / 4));
             int blank = Math.min(h - 1, screen * blankScreens);
-            int colorEnd = Math.max(blank + 1, (int)(h * 0.78f));
+            int colorEnd = Math.max(blank + 1, (int)(h * (immersiveTheme ? 0.96f : 0.78f)));
 
             p.setShader(null);
             canvas.save();
@@ -2601,6 +2629,7 @@ public class MainActivity extends Activity {
                 if (d[1] < clip.top - dp(56) || d[1] > clip.bottom + dp(56)) continue;
 
                 if ("soft_launch".equals(journeyTheme)) {
+                    drawNativeFoliage(canvas, d);
                     drawNativeFlower(canvas, d);
                 } else if ("moth".equals(journeyTheme)) {
                     drawCeramicMoth(canvas, d);
@@ -2611,6 +2640,70 @@ public class MainActivity extends Activity {
                     canvas.drawCircle(d[0], d[1], d[2], p);
                 }
             }
+        }
+
+        private void drawNativeFoliage(Canvas canvas, float[] d) {
+            float x = d[0], y = d[1], s = d[2];
+            float progress = d.length > 6 ? d[6] : 1f;
+            int alpha = Math.min(235, (int)(75 + progress * 150));
+
+            int darkGreen = Color.rgb(
+                Math.round(92 - progress * 35),
+                Math.round(119 - progress * 42),
+                Math.round(82 - progress * 30)
+            );
+            int gumGreen = Color.rgb(
+                Math.round(128 - progress * 42),
+                Math.round(148 - progress * 48),
+                Math.round(105 - progress * 34)
+            );
+
+            canvas.save();
+            canvas.rotate(d[4] * 0.35f, x, y);
+            p.setShader(null);
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(1.3f, s * 0.055f));
+            p.setColor(Color.argb(alpha, Color.red(darkGreen), Color.green(darkGreen), Color.blue(darkGreen)));
+
+            int branches = 1 + Math.round(progress * 3f);
+            for (int b = 0; b < branches; b++) {
+                float direction = (b % 2 == 0 ? -1f : 1f);
+                float offset = (b - branches / 2f) * s * 0.18f;
+                Path stem = new Path();
+                stem.moveTo(x, y + s * (0.72f + b * 0.08f));
+                stem.cubicTo(
+                    x + direction * s * 0.20f, y + s * 0.38f + offset,
+                    x + direction * s * 0.62f, y - s * 0.05f + offset,
+                    x + direction * s * (0.95f + progress * 0.35f), y - s * (0.48f + b * 0.08f)
+                );
+                canvas.drawPath(stem, p);
+
+                int leaves = 3 + Math.round(progress * 4f);
+                p.setStyle(Paint.Style.FILL);
+                for (int leaf = 0; leaf < leaves; leaf++) {
+                    float t = (leaf + 1f) / (leaves + 1f);
+                    float cx = x + direction * s * (0.12f + t * (0.72f + progress * 0.28f));
+                    float cy = y + s * 0.52f - t * s * (0.90f + progress * 0.25f) + offset;
+                    float lw = s * (0.23f + progress * 0.10f);
+                    float lh = s * 0.075f;
+                    p.setColor(Color.argb(
+                        Math.max(70, alpha - leaf * 8),
+                        Color.red(leaf % 2 == 0 ? gumGreen : darkGreen),
+                        Color.green(leaf % 2 == 0 ? gumGreen : darkGreen),
+                        Color.blue(leaf % 2 == 0 ? gumGreen : darkGreen)
+                    ));
+                    canvas.save();
+                    canvas.rotate(direction * (18f + leaf * 7f), cx, cy);
+                    canvas.drawOval(new RectF(cx - lw, cy - lh, cx + lw, cy + lh), p);
+                    canvas.restore();
+                }
+                p.setStyle(Paint.Style.STROKE);
+                p.setColor(Color.argb(alpha, Color.red(darkGreen), Color.green(darkGreen), Color.blue(darkGreen)));
+            }
+
+            p.setStyle(Paint.Style.FILL);
+            canvas.restore();
         }
 
         private void drawNativeFlower(Canvas canvas, float[] d) {
@@ -3462,6 +3555,20 @@ public class MainActivity extends Activity {
 
     private HiddenPalette hiddenPalette() {
         String theme = currentTheme();
+        if ("soft_launch".equals(theme)) {
+            return new HiddenPalette(
+                Color.rgb(24, 21, 29),
+                Color.rgb(247, 232, 220),
+                Color.rgb(190, 165, 168)
+            );
+        }
+        if ("moth".equals(theme)) {
+            return new HiddenPalette(
+                Color.rgb(13, 13, 16),
+                Color.rgb(239, 229, 214),
+                Color.rgb(166, 151, 139)
+            );
+        }
         return new HiddenPalette(
             ThemeArt.background(theme, getResources()),
             ThemeArt.foreground(theme, getResources()),
