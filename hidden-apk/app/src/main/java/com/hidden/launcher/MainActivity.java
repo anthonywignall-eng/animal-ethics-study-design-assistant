@@ -2713,8 +2713,17 @@ public class MainActivity extends Activity {
                 if (d[1] < clip.top - dp(56) || d[1] > clip.bottom + dp(56)) continue;
 
                 if ("soft_launch".equals(journeyTheme)) {
-                    drawNativeFoliage(canvas, d);
-                    drawNativeFlower(canvas, d);
+                    float progress = d.length > 6 ? d[6] : 1f;
+                    ThemeArt.drawNativeCluster(
+                        canvas,
+                        d[0],
+                        d[1],
+                        d[2] * (0.95f + progress * 0.28f),
+                        progress,
+                        (int)d[5],
+                        d[4],
+                        d[3]
+                    );
                 } else if ("moth".equals(journeyTheme)) {
                     drawCeramicMoth(canvas, d);
                 } else {
