@@ -5,6 +5,7 @@ import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 
 import java.util.Random;
@@ -110,6 +111,7 @@ public final class ThemeArt {
             drawPaint(canvas, width, height, seed, true);
         } else if ("soft_launch".equals(theme)) {
             drawSoftPaper(canvas, width, height, seed);
+            drawSoftBotanicalEdges(canvas, width, height, seed);
         } else if ("moth".equals(theme)) {
             drawMothPaper(canvas, width, height, seed);
         } else if ("8bit".equals(theme)) {
