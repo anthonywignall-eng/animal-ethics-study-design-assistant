@@ -5,6 +5,9 @@ import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.LinearGradient;
+import android.graphics.RadialGradient;
+import android.graphics.Shader;
 import android.graphics.Path;
 import android.graphics.RectF;
 
@@ -205,92 +208,380 @@ public final class ThemeArt {
     }
 
     private static void drawSoftBotanicalEdges(Canvas canvas, int width, int height, long seed) {
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        Random random = new Random(seed ^ 0xB07A11L);
+        // Deliberately composed rather than patterned. The centre remains almost
+        // empty; recognisable Australian natives grow in from the screen edges.
+        float unit = Math.max(42f, width * 0.105f);
 
-        int sprays = Math.max(7, height / Math.max(1, width / 2));
-        for (int i = 0; i < sprays; i++) {
-            boolean left = i % 2 == 0;
-            float y = height * (0.10f + (i + 0.5f) / sprays * 0.78f) + (random.nextFloat() - 0.5f) * height * 0.06f;
-            float reach = width * (0.13f + random.nextFloat() * 0.10f);
-            float baseX = left ? -width * 0.015f : width * 1.015f;
-            float tipX = left ? reach : width - reach;
-            int green = random.nextBoolean() ? Color.rgb(101, 128, 91) : Color.rgb(125, 145, 105);
+        drawNativeCluster(canvas, width * 0.035f, height * 0.145f, unit * 1.08f, 0.30f, 3, -12f, 0.92f);
+        drawNativeCluster(canvas, width * 0.965f, height * 0.205f, unit * 1.02f, 0.28f, 1, 16f, 0.90f);
+        drawNativeCluster(canvas, width * 0.025f, height * 0.395f, unit * 0.88f, 0.22f, 0, -8f, 0.82f);
+        drawNativeCluster(canvas, width * 0.975f, height * 0.525f, unit * 1.12f, 0.30f, 4, 12f, 0.90f);
+        drawNativeCluster(canvas, width * 0.035f, height * 0.705f, unit * 0.92f, 0.24f, 1, -18f, 0.84f);
+        drawNativeCluster(canvas, width * 0.965f, height * 0.825f, unit * 0.92f, 0.25f, 2, 14f, 0.82f);
+    }
+
+    public static void drawNativeCluster(
+        Canvas canvas,
+        float x,
+        float y,
+        float size,
+        float progress,
+        int type,
+        float rotation,
+        float opacity
+    ) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        float s = Math.max(18f, size);
+        float depth = Math.max(0f, Math.min(1f, progress));
+        int alpha = Math.max(40, Math.min(255, Math.round(255f * opacity)));
+
+        canvas.save();
+        canvas.rotate(rotation, x, y);
+
+        int stem = mix(Color.rgb(126, 93, 72), Color.rgb(66, 59, 52), depth * 0.65f);
+        int leafDark = mix(Color.rgb(93, 119, 86), Color.rgb(39, 61, 49), depth * 0.78f);
+        int leafLight = mix(Color.rgb(139, 151, 113), Color.rgb(72, 91, 70), depth * 0.68f);
+
+        // Soft painted shadow under the cluster gives the flat Canvas shapes depth.
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.argb(Math.round(alpha * 0.13f), 47, 38, 39));
+        canvas.drawOval(new RectF(x - s * 0.88f, y - s * 0.58f, x + s * 0.88f, y + s * 0.80f), p);
+
+        // Main woody stem.
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        p.setStrokeJoin(Paint.Join.ROUND);
+        p.setStrokeWidth(Math.max(1.5f, s * 0.045f));
+        p.setColor(Color.argb(alpha, Color.red(stem), Color.green(stem), Color.blue(stem)));
+        Path branch = new Path();
+        branch.moveTo(x - s * 0.76f, y + s * 0.62f);
+        branch.cubicTo(
+            x - s * 0.42f, y + s * 0.38f,
+            x - s * 0.18f, y + s * 0.08f,
+            x + s * 0.34f, y - s * 0.36f
+        );
+        canvas.drawPath(branch, p);
+
+        // Secondary twigs make the foliage read like a botanical drawing.
+        p.setStrokeWidth(Math.max(1f, s * 0.024f));
+        for (int i = 0; i < 4; i++) {
+            float t = 0.20f + i * 0.19f;
+            float bx = x - s * 0.67f + s * 0.94f * t;
+            float by = y + s * 0.54f - s * 0.82f * t;
+            float side = i % 2 == 0 ? -1f : 1f;
+            canvas.drawLine(bx, by, bx + side * s * 0.34f, by - s * (0.16f + i * 0.025f), p);
+        }
+
+        // Long eucalyptus leaves with two-tone fill and a fine central vein.
+        for (int i = 0; i < 9; i++) {
+            float t = 0.10f + i * 0.085f;
+            float cx = x - s * 0.68f + s * 1.03f * t;
+            float cy = y + s * 0.58f - s * 0.94f * t;
+            float side = i % 2 == 0 ? -1f : 1f;
+            cx += side * s * (0.20f + (i % 3) * 0.035f);
+            cy -= s * 0.10f;
+            float angle = side * (38f + (i % 3) * 8f) - 18f;
+
+            canvas.save();
+            canvas.rotate(angle, cx, cy);
+            Path leaf = lanceolate(cx, cy, s * (0.30f + (i % 2) * 0.035f), s * 0.095f);
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new LinearGradient(
+                cx - s * 0.28f, cy, cx + s * 0.28f, cy,
+                Color.argb(alpha, Color.red(leafDark), Color.green(leafDark), Color.blue(leafDark)),
+                Color.argb(alpha, Color.red(leafLight), Color.green(leafLight), Color.blue(leafLight)),
+                Shader.TileMode.CLAMP
+            ));
+            canvas.drawPath(leaf, p);
+            p.setShader(null);
 
             p.setStyle(Paint.Style.STROKE);
-            p.setStrokeCap(Paint.Cap.ROUND);
-            p.setStrokeWidth(Math.max(2f, width * 0.0045f));
-            p.setColor(Color.argb(150, Color.red(green), Color.green(green), Color.blue(green)));
+            p.setStrokeWidth(Math.max(0.7f, s * 0.010f));
+            p.setColor(Color.argb(Math.round(alpha * 0.45f), 224, 215, 183));
+            canvas.drawLine(cx - s * 0.22f, cy, cx + s * 0.22f, cy, p);
+            canvas.restore();
+        }
 
-            Path stem = new Path();
-            stem.moveTo(baseX, y + height * 0.035f);
-            stem.cubicTo(
-                left ? width * 0.03f : width * 0.97f, y + height * 0.015f,
-                left ? width * 0.08f : width * 0.92f, y - height * 0.025f,
-                tipX, y
-            );
-            canvas.drawPath(stem, p);
+        float fx = x + s * 0.30f;
+        float fy = y - s * 0.39f;
 
-            p.setStyle(Paint.Style.FILL);
-            for (int leaf = 0; leaf < 5; leaf++) {
-                float t = 0.18f + leaf * 0.16f;
-                float cx = baseX + (tipX - baseX) * t;
-                float cy = y + height * (0.025f - t * 0.035f) + (leaf % 2 == 0 ? -1 : 1) * height * 0.008f;
-                float lw = width * (0.032f + random.nextFloat() * 0.012f);
-                float lh = width * 0.010f;
-                p.setColor(Color.argb(120 + random.nextInt(40), Color.red(green), Color.green(green), Color.blue(green)));
-                canvas.save();
-                canvas.rotate((left ? -18f : 18f) + (leaf % 2 == 0 ? -24f : 24f), cx, cy);
-                canvas.drawOval(new RectF(cx - lw, cy - lh, cx + lw, cy + lh), p);
-                canvas.restore();
-            }
+        switch (Math.floorMod(type, 6)) {
+            case 0:
+                drawWattle(canvas, p, fx, fy, s, alpha, depth);
+                break;
+            case 1:
+                drawGumBlossom(canvas, p, fx, fy, s, alpha, depth);
+                break;
+            case 2:
+                drawFlannelFlower(canvas, p, fx, fy, s, alpha, depth);
+                break;
+            case 3:
+                drawWaratah(canvas, p, fx, fy, s, alpha, depth);
+                break;
+            case 4:
+                drawBanksia(canvas, p, fx, fy, s, alpha, depth);
+                break;
+            default:
+                drawGumBuds(canvas, p, fx, fy, s, alpha, depth);
+                break;
+        }
 
-            int flowerType = i % 4;
-            float fx = left ? width * (0.07f + random.nextFloat() * 0.08f) : width * (0.93f - random.nextFloat() * 0.08f);
-            float fs = width * (0.022f + random.nextFloat() * 0.010f);
+        p.setShader(null);
+        p.setStyle(Paint.Style.FILL);
+        canvas.restore();
+    }
 
-            if (flowerType == 0) {
-                p.setColor(Color.argb(190, 229, 183, 66));
-                for (int n = 0; n < 6; n++) {
-                    float ox = (n % 2 == 0 ? -1f : 1f) * fs * 0.42f;
-                    float oy = (n - 2.5f) * fs * 0.43f;
-                    canvas.drawCircle(fx + ox, y + oy, fs * 0.23f, p);
-                }
-            } else if (flowerType == 1) {
-                p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(Math.max(1f, fs * 0.10f));
-                p.setColor(Color.argb(175, 213, 111, 143));
-                for (int n = 0; n < 14; n++) {
-                    double a = Math.PI * 2d * n / 14d;
-                    canvas.drawLine(fx, y, fx + (float)Math.cos(a) * fs, y + (float)Math.sin(a) * fs, p);
-                }
-                p.setStyle(Paint.Style.FILL);
-                p.setColor(Color.argb(190, 239, 181, 186));
-                canvas.drawCircle(fx, y, fs * 0.26f, p);
-            } else if (flowerType == 2) {
-                p.setColor(Color.argb(185, 184, 67, 83));
-                for (int n = 0; n < 8; n++) {
-                    double a = Math.PI * 2d * n / 8d;
-                    float cx = fx + (float)Math.cos(a) * fs * 0.42f;
-                    float cy = y + (float)Math.sin(a) * fs * 0.34f;
-                    canvas.drawOval(new RectF(cx - fs * 0.18f, cy - fs * 0.31f, cx + fs * 0.18f, cy + fs * 0.31f), p);
-                }
-                p.setColor(Color.argb(195, 225, 129, 127));
-                canvas.drawCircle(fx, y, fs * 0.27f, p);
-            } else {
-                p.setColor(Color.argb(175, 191, 132, 78));
-                RectF cone = new RectF(fx - fs * 0.32f, y - fs * 0.95f, fx + fs * 0.32f, y + fs * 0.65f);
-                canvas.drawRoundRect(cone, fs * 0.24f, fs * 0.24f, p);
-                p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(Math.max(1f, fs * 0.07f));
-                p.setColor(Color.argb(160, 235, 177, 112));
-                for (int n = 0; n < 5; n++) {
-                    float yy = y - fs * 0.67f + n * fs * 0.28f;
-                    canvas.drawLine(fx - fs * 0.20f, yy, fx + fs * 0.20f, yy, p);
-                }
-                p.setStyle(Paint.Style.FILL);
+    private static Path lanceolate(float x, float y, float halfLength, float halfWidth) {
+        Path path = new Path();
+        path.moveTo(x - halfLength, y);
+        path.cubicTo(
+            x - halfLength * 0.42f, y - halfWidth,
+            x + halfLength * 0.42f, y - halfWidth,
+            x + halfLength, y
+        );
+        path.cubicTo(
+            x + halfLength * 0.42f, y + halfWidth,
+            x - halfLength * 0.42f, y + halfWidth,
+            x - halfLength, y
+        );
+        path.close();
+        return path;
+    }
+
+    private static void drawWattle(Canvas c, Paint p, float x, float y, float s, int alpha, float depth) {
+        int gold = mix(Color.rgb(238, 194, 71), Color.rgb(187, 137, 49), depth * 0.52f);
+        int light = mix(Color.rgb(255, 226, 126), Color.rgb(220, 179, 91), depth * 0.42f);
+
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(Math.max(1f, s * 0.022f));
+        p.setColor(Color.argb(alpha, 93, 113, 74));
+        Path spray = new Path();
+        spray.moveTo(x - s * 0.48f, y + s * 0.38f);
+        spray.cubicTo(x - s * 0.20f, y + s * 0.10f, x + s * 0.12f, y - s * 0.10f, x + s * 0.44f, y - s * 0.50f);
+        c.drawPath(spray, p);
+
+        p.setStyle(Paint.Style.FILL);
+        for (int i = 0; i < 13; i++) {
+            float t = i / 12f;
+            float bx = x - s * 0.34f + t * s * 0.68f;
+            float by = y + s * 0.25f - t * s * 0.68f;
+            float side = (i % 2 == 0 ? -1f : 1f) * s * (0.11f + (i % 3) * 0.018f);
+            float cx = bx + side;
+            float cy = by;
+            float r = s * (0.085f + (i % 3) * 0.007f);
+
+            p.setShader(new RadialGradient(
+                cx - r * 0.28f, cy - r * 0.30f, r * 1.15f,
+                new int[]{
+                    Color.argb(alpha, Color.red(light), Color.green(light), Color.blue(light)),
+                    Color.argb(alpha, Color.red(gold), Color.green(gold), Color.blue(gold)),
+                    Color.argb(Math.round(alpha * 0.72f), 141, 99, 36)
+                },
+                new float[]{0f, 0.58f, 1f},
+                Shader.TileMode.CLAMP
+            ));
+            c.drawCircle(cx, cy, r, p);
+            p.setShader(null);
+
+            p.setColor(Color.argb(Math.round(alpha * 0.65f), 255, 235, 152));
+            for (int d = 0; d < 5; d++) {
+                double a = d * Math.PI * 0.4;
+                c.drawCircle(cx + (float)Math.cos(a) * r * 0.52f, cy + (float)Math.sin(a) * r * 0.52f, r * 0.075f, p);
             }
         }
+    }
+
+    private static void drawGumBlossom(Canvas c, Paint p, float x, float y, float s, int alpha, float depth) {
+        int pinkA = mix(Color.rgb(236, 143, 164), Color.rgb(164, 86, 112), depth * 0.55f);
+        int pinkB = mix(Color.rgb(250, 184, 192), Color.rgb(202, 118, 139), depth * 0.45f);
+
+        // Woody cup and unopened buds.
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.argb(alpha, 157, 110, 76));
+        c.drawOval(new RectF(x - s * 0.18f, y + s * 0.06f, x + s * 0.18f, y + s * 0.30f), p);
+        p.setColor(Color.argb(alpha, 112, 128, 82));
+        for (int i = 0; i < 3; i++) {
+            float bx = x + (i - 1) * s * 0.27f;
+            c.drawOval(new RectF(bx - s * 0.09f, y - s * 0.34f, bx + s * 0.09f, y - s * 0.12f), p);
+        }
+
+        // Dozens of irregular stamens create the soft brush-like bloom.
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        for (int i = 0; i < 38; i++) {
+            double a = Math.PI * 2d * i / 38d + (i % 4) * 0.055d;
+            float len = s * (0.43f + (i % 5) * 0.035f);
+            float ex = x + (float)Math.cos(a) * len;
+            float ey = y - s * 0.08f + (float)Math.sin(a) * len * 0.82f;
+            int col = i % 2 == 0 ? pinkA : pinkB;
+            p.setColor(Color.argb(alpha, Color.red(col), Color.green(col), Color.blue(col)));
+            p.setStrokeWidth(Math.max(0.9f, s * (0.012f + (i % 3) * 0.002f)));
+            c.drawLine(x, y - s * 0.05f, ex, ey, p);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.argb(alpha, 245, 202, 118));
+            c.drawCircle(ex, ey, Math.max(1f, s * 0.022f), p);
+            p.setStyle(Paint.Style.STROKE);
+        }
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.argb(alpha, Color.red(pinkB), Color.green(pinkB), Color.blue(pinkB)));
+        c.drawCircle(x, y - s * 0.05f, s * 0.13f, p);
+    }
+
+    private static void drawFlannelFlower(Canvas c, Paint p, float x, float y, float s, int alpha, float depth) {
+        int petal = mix(Color.rgb(247, 241, 226), Color.rgb(209, 204, 188), depth * 0.42f);
+        int edge = mix(Color.rgb(187, 194, 166), Color.rgb(130, 144, 117), depth * 0.55f);
+
+        for (int i = 0; i < 9; i++) {
+            c.save();
+            c.rotate(i * 40f + (i % 2) * 3f, x, y);
+            Path petalPath = new Path();
+            petalPath.moveTo(x, y - s * 0.07f);
+            petalPath.cubicTo(x - s * 0.16f, y - s * 0.25f, x - s * 0.12f, y - s * 0.66f, x, y - s * 0.78f);
+            petalPath.cubicTo(x + s * 0.12f, y - s * 0.66f, x + s * 0.16f, y - s * 0.25f, x, y - s * 0.07f);
+            petalPath.close();
+
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new LinearGradient(
+                x, y - s * 0.76f, x, y,
+                Color.argb(alpha, 255, 250, 239),
+                Color.argb(alpha, Color.red(petal), Color.green(petal), Color.blue(petal)),
+                Shader.TileMode.CLAMP
+            ));
+            c.drawPath(petalPath, p);
+            p.setShader(null);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(0.7f, s * 0.012f));
+            p.setColor(Color.argb(Math.round(alpha * 0.55f), Color.red(edge), Color.green(edge), Color.blue(edge)));
+            c.drawLine(x, y - s * 0.12f, x, y - s * 0.65f, p);
+            c.restore();
+        }
+
+        p.setStyle(Paint.Style.FILL);
+        p.setShader(new RadialGradient(
+            x, y, s * 0.24f,
+            Color.argb(alpha, 226, 199, 103),
+            Color.argb(alpha, 99, 122, 81),
+            Shader.TileMode.CLAMP
+        ));
+        c.drawCircle(x, y, s * 0.23f, p);
+        p.setShader(null);
+    }
+
+    private static void drawWaratah(Canvas c, Paint p, float x, float y, float s, int alpha, float depth) {
+        int deep = mix(Color.rgb(155, 48, 65), Color.rgb(92, 38, 49), depth * 0.62f);
+        int mid = mix(Color.rgb(202, 74, 88), Color.rgb(133, 55, 70), depth * 0.55f);
+        int light = mix(Color.rgb(235, 116, 118), Color.rgb(179, 85, 96), depth * 0.48f);
+
+        // Dark green bracts around the flower.
+        p.setStyle(Paint.Style.FILL);
+        for (int i = 0; i < 10; i++) {
+            c.save();
+            c.rotate(i * 36f, x, y + s * 0.12f);
+            p.setColor(Color.argb(alpha, 70, 99, 69));
+            c.drawOval(new RectF(x - s * 0.10f, y + s * 0.08f, x + s * 0.10f, y + s * 0.72f), p);
+            c.restore();
+        }
+
+        int[] cols = {deep, mid, light};
+        for (int ring = 0; ring < 4; ring++) {
+            int petals = 16 - ring * 3;
+            float radius = s * (0.43f - ring * 0.085f);
+            int col = cols[Math.min(2, ring)];
+            for (int i = 0; i < petals; i++) {
+                double a = Math.PI * 2d * i / petals + ring * 0.17d;
+                float cx = x + (float)Math.cos(a) * radius;
+                float cy = y - s * 0.06f + (float)Math.sin(a) * radius * 0.76f;
+                c.save();
+                c.rotate((float)Math.toDegrees(a) + 90f, cx, cy);
+                p.setStyle(Paint.Style.FILL);
+                p.setShader(new LinearGradient(
+                    cx, cy - s * 0.23f, cx, cy + s * 0.23f,
+                    Color.argb(alpha, Color.red(light), Color.green(light), Color.blue(light)),
+                    Color.argb(alpha, Color.red(col), Color.green(col), Color.blue(col)),
+                    Shader.TileMode.CLAMP
+                ));
+                c.drawOval(new RectF(cx - s * 0.095f, cy - s * 0.25f, cx + s * 0.095f, cy + s * 0.25f), p);
+                p.setShader(null);
+                c.restore();
+            }
+        }
+        p.setColor(Color.argb(alpha, Color.red(light), Color.green(light), Color.blue(light)));
+        c.drawCircle(x, y - s * 0.06f, s * 0.15f, p);
+    }
+
+    private static void drawBanksia(Canvas c, Paint p, float x, float y, float s, int alpha, float depth) {
+        int ochre = mix(Color.rgb(197, 127, 76), Color.rgb(116, 79, 54), depth * 0.65f);
+        int cream = mix(Color.rgb(240, 179, 111), Color.rgb(179, 126, 83), depth * 0.55f);
+
+        // Two serrated leaves behind the cone.
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.argb(alpha, 69, 99, 67));
+        for (int side : new int[]{-1, 1}) {
+            c.save();
+            c.rotate(side * 28f, x, y + s * 0.15f);
+            Path leaf = lanceolate(x + side * s * 0.16f, y + s * 0.24f, s * 0.62f, s * 0.14f);
+            c.drawPath(leaf, p);
+            c.restore();
+        }
+
+        RectF cone = new RectF(x - s * 0.31f, y - s * 0.72f, x + s * 0.31f, y + s * 0.58f);
+        p.setShader(new LinearGradient(
+            cone.left, cone.top, cone.right, cone.bottom,
+            Color.argb(alpha, Color.red(cream), Color.green(cream), Color.blue(cream)),
+            Color.argb(alpha, Color.red(ochre), Color.green(ochre), Color.blue(ochre)),
+            Shader.TileMode.CLAMP
+        ));
+        c.drawRoundRect(cone, s * 0.28f, s * 0.28f, p);
+        p.setShader(null);
+
+        // Repeating follicles give the cone a recognisable banksia texture.
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(Math.max(0.8f, s * 0.012f));
+        p.setColor(Color.argb(Math.round(alpha * 0.72f), 104, 68, 48));
+        for (int row = 0; row < 10; row++) {
+            float yy = y - s * 0.57f + row * s * 0.115f;
+            for (int col = -1; col <= 1; col++) {
+                float xx = x + col * s * 0.16f + (row % 2 == 0 ? s * 0.075f : 0f);
+                c.drawOval(new RectF(xx - s * 0.055f, yy - s * 0.035f, xx + s * 0.055f, yy + s * 0.035f), p);
+            }
+        }
+        p.setStyle(Paint.Style.FILL);
+    }
+
+    private static void drawGumBuds(Canvas c, Paint p, float x, float y, float s, int alpha, float depth) {
+        int bud = mix(Color.rgb(176, 112, 111), Color.rgb(107, 72, 76), depth * 0.58f);
+        int cap = mix(Color.rgb(224, 155, 151), Color.rgb(149, 91, 100), depth * 0.52f);
+
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(Math.max(1f, s * 0.022f));
+        p.setColor(Color.argb(alpha, 88, 108, 73));
+        for (int i = 0; i < 5; i++) {
+            float angle = -0.65f + i * 0.32f;
+            float ex = x + (float)Math.sin(angle) * s * 0.58f;
+            float ey = y - (float)Math.cos(angle) * s * 0.58f;
+            c.drawLine(x, y + s * 0.25f, ex, ey, p);
+
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new LinearGradient(
+                ex, ey - s * 0.16f, ex, ey + s * 0.16f,
+                Color.argb(alpha, Color.red(cap), Color.green(cap), Color.blue(cap)),
+                Color.argb(alpha, Color.red(bud), Color.green(bud), Color.blue(bud)),
+                Shader.TileMode.CLAMP
+            ));
+            c.drawOval(new RectF(ex - s * 0.10f, ey - s * 0.14f, ex + s * 0.10f, ey + s * 0.15f), p);
+            p.setShader(null);
+            p.setStyle(Paint.Style.STROKE);
+        }
+        p.setStyle(Paint.Style.FILL);
+    }
+
+    private static int mix(int a, int b, float amount) {
+        float t = Math.max(0f, Math.min(1f, amount));
+        return Color.rgb(
+            Math.round(Color.red(a) + (Color.red(b) - Color.red(a)) * t),
+            Math.round(Color.green(a) + (Color.green(b) - Color.green(a)) * t),
+            Math.round(Color.blue(a) + (Color.blue(b) - Color.blue(a)) * t)
+        );
     }
 
     private static void drawMothPaper(Canvas canvas, int width, int height, long seed) {
